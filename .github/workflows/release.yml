@@ -1,0 +1,66 @@
+# Builds the Windows installers and publishes them as a GitHub Release.
+#
+# Runs when a version tag is pushed (e.g. `git tag v0.2.0 && git push origin v0.2.0`),
+# or by hand from the Actions tab. The release is created as a draft: check it,
+# then click "Publish release" on GitHub.
+#
+# Needs two repository secrets (Settings → Secrets and variables → Actions):
+#   TAURI_SIGNING_PRIVATE_KEY           the updater signing key (contents of the .key file)
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  its password
+#
+# Actions are pinned to commit SHAs: this job can read the signing key, so a
+# moved tag must not be able to change what runs. Dependabot keeps them current.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # create the release and upload its files
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      # Pinned to a commit, so the toolchain has to be named (it's otherwise read from the tag).
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Test
+        run: |
+          npx tsc --noEmit
+          cd src-tauri
+          cargo test --locked
+
+      - name: Build and publish
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          # __VERSION__ is filled in from tauri.conf.json.
+          tagName: v__VERSION__
+          releaseName: Motherlode Uplink v__VERSION__
+          releaseBody: See the wiki for installing and setting up.
+          releaseDraft: true
+          prerelease: false
+          # Uploads latest.json, which the in-app updater reads.
+          includeUpdaterJson: true

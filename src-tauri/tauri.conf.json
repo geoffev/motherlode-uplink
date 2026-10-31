@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Motherlode Price Reporter",
+  "mainBinaryName": "motherlode-price-reporter",
+  "version": "0.1.0",
+  "identifier": "com.motherlode.uplink",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Motherlode Uplink",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 860,
+        "minHeight": 560,
+        "visible": false,
+        "backgroundColor": "#0A0B0E"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src ipc: http://ipc.localhost",
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/**", "$APPLOCALDATA/**"]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU1MUM3NThFRkQwNjVBNzMKUldSeldnYjlqblVjVmM5TTZHNTFYL0VncnVzVWpQek9OTEsreDR6QnhvNEdBM2JBU3IyWEJmKy8K",
+      "endpoints": [
+        "https://github.com/geoffev/motherlode-uplink/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

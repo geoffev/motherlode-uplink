@@ -1,0 +1,52 @@
+[package]
+name = "motherlode-uplink"
+version = "0.1.0"
+description = "Motherlode Price Reporter"
+authors = ["Motherlode"]
+edition = "2024"
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "motherlode_uplink_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["image-png", "protocol-asset", "tray-icon"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri-plugin-single-instance = "2.5.5"
+tauri-plugin-autostart = "2.7.0"
+tauri-plugin-updater = "2.14.1"
+tauri-plugin-dialog = "2.8.4"
+tauri-plugin-log = "2.10.1"
+log = "0.4.35"
+image = "0.25.10"
+xcap = "0.9.8"
+strsim = "0.11.1"
+thiserror = "2.0.21"
+which = "8.0.6"
+tempfile = "3.27.0"
+tokio = { version = "1.54.1", features = ["time", "sync", "macros", "rt"] }
+uuid = { version = "1.29.0", features = ["v4", "serde"] }
+chrono = { version = "0.4.45", features = ["serde"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+keyring = { version = "3", features = ["windows-native", "apple-native", "sync-secret-service", "crypto-rust"] }
+tauri-plugin-opener = "2.7.2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+# Unwind rather than abort: a panic on the capture thread or in the send queue
+# is caught, shown and that part restarted, instead of closing the whole app.
+panic = "unwind"
+strip = true
+
+[target."cfg(windows)".dependencies]
+windows = { version = "0.62", features = ["Foundation", "Graphics", "Graphics_Capture", "Graphics_DirectX", "Graphics_DirectX_Direct3D11", "Win32_Foundation", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_System_WinRT", "Win32_System_WinRT_Direct3D11", "Win32_System_WinRT_Graphics_Capture"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Diagnostics_ToolHelp"] }
