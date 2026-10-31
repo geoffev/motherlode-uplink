@@ -22,7 +22,6 @@ use crate::util::Guard;
 
 /// 60/min is the limit; leave room for catalog and /me calls.
 const MIN_INTERVAL: Duration = Duration::from_millis(1250);
-/// Sent reports stay in the status list this long.
 const KEEP_SENT_HOURS: i64 = 24;
 /// Motherlode's limit on `observedAt` age, less a margin for the request itself.
 const MAX_AGE: chrono::Duration = chrono::Duration::minutes(24 * 60 - 2);
@@ -32,7 +31,6 @@ pub struct Outbox {
     items: Vec<OutboxItem>,
     /// Set by a 401; cleared when a new key is stored.
     pub paused_for_auth: bool,
-    /// Set by a 429: nothing is sent before this.
     hold_until: Option<DateTime<Utc>>,
 }
 
@@ -83,7 +81,6 @@ impl Outbox {
         }
     }
 
-    /// Reports too old for Motherlode to accept: failed, with the reason.
     fn expire(&mut self) -> Vec<OutboxItem> {
         let cutoff = Utc::now() - MAX_AGE;
         let mut out = Vec::new();
@@ -100,7 +97,6 @@ impl Outbox {
         out
     }
 
-    /// The next item due, marked as sending; or how long to wait.
     fn take_due(&mut self) -> Result<OutboxItem, Option<Duration>> {
         if self.paused_for_auth {
             return Err(None);
@@ -171,10 +167,8 @@ impl Outbox {
     }
 }
 
-/// Wakes the sender when something is queued or the key changes.
 pub type Wake = Arc<Notify>;
 
-/// Background sender. Runs for the life of the app.
 pub async fn run(app: AppHandle, wake: Wake) {
     let mut last_prune = Utc::now() - chrono::Duration::hours(1);
     let mut cached: Option<((String, String), crate::api::Client)> = None;

@@ -27,7 +27,6 @@ impl Readings {
         crate::util::save_json(&self.path, &self.list);
     }
 
-    /// Newest first.
     pub fn all(&self) -> Vec<Reading> {
         let mut v = self.list.clone();
         v.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -50,7 +49,6 @@ impl Readings {
         Some(self.list.remove(i))
     }
 
-    /// Takes out readings last seen before `cutoff` (and saves, if any went).
     pub fn prune_older_than(&mut self, cutoff: DateTime<Utc>) -> Vec<Reading> {
         let (stale, keep): (Vec<Reading>, Vec<Reading>) = self.list.drain(..).partition(|r| r.updated_at < cutoff);
         self.list = keep;
@@ -111,7 +109,6 @@ impl Crops {
         }
     }
 
-    /// Removes day folders older than the retention period.
     pub fn cleanup(&self, keep_days: u32) {
         let Ok(entries) = std::fs::read_dir(&self.root) else { return };
         let cutoff = Utc::now().date_naive() - chrono::Duration::days(keep_days as i64);

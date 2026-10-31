@@ -23,7 +23,6 @@ export function parsePriceInput(s: string): number | null {
   return n == null ? null : Math.round(n)
 }
 
-/** Typed text → SCU, two decimals at most. */
 export function parseScuInput(s: string): number | null {
   const n = parseNumberInput(s)
   return n == null ? null : Math.round(n * 100) / 100

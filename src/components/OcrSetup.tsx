@@ -4,12 +4,10 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { errorText, ipc } from '../lib/ipc'
 import type { Settings } from '../lib/types'
 
-/** Tesseract's own install page; it links the Windows builds. */
 export const TESSERACT_HELP_URL = 'https://tesseract-ocr.github.io/tessdoc/Installation.html'
 
 const isWindows = navigator.userAgent.includes('Windows')
 
-/** File picker for the Tesseract program (only .exe files on Windows). */
 export async function pickTesseract(): Promise<string | null> {
   const path = await open({
     multiple: false,
@@ -19,7 +17,6 @@ export async function pickTesseract(): Promise<string | null> {
   return typeof path === 'string' ? path : null
 }
 
-/** Shown while no OCR engine is set up: prices can't be read until it is. */
 export function OcrSetupBanner({ settings, onSaved }: { settings: Settings; onSaved: (s: Settings) => void }) {
   const [error, setError] = useState<string | null>(null)
 

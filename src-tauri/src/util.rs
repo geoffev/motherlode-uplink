@@ -30,7 +30,6 @@ pub fn save_json<T: serde::Serialize>(path: &Path, value: &T) {
     }
 }
 
-/// Upper-case letters and digits only, for fuzzy name comparisons.
 pub fn normalise(s: &str) -> String {
     s.chars().filter(|c| c.is_ascii_alphanumeric()).map(|c| c.to_ascii_uppercase()).collect()
 }

@@ -18,9 +18,8 @@ npm run tauri dev     # the app
 npm test              # Rust unit tests
 ```
 
-In dev builds the empty queue has an **Add demo reading**
-button, and **Read a screenshot…** runs a saved screenshot through the same
-pipeline as live capture.
+**Read a screenshot…** on the empty queue runs a saved screenshot of a terminal
+through the same pipeline as live capture.
 
 ## How it fits together
 
@@ -55,11 +54,8 @@ autostart, crop retention.
 
 Not done yet:
 
-- **Detection hasn't run real OCR yet.** `detect.rs` follows the real terminal
-  (samples/1920x1080_orison_demand-and-stock.png) and is tested on that
-  screen's word layout, but not on what Tesseract actually returns for it.
-  Next: install Tesseract, run the sample through **Read a screenshot…**, and
-  add screenshots at other resolutions (see [samples/README.md](samples/README.md)).
+- **Detection is tuned on a handful of screenshots** (1080p and 3440×1440).
+  Other resolutions, aspect ratios and UI scales still need checking.
 - **Scrolling lists:** each frame is read on its own; rows from a scrolled list
   arrive as a new screen rather than joining the earlier one.
 - **Capture backends:** Windows uses our own Windows Graphics Capture session

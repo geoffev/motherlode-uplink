@@ -26,17 +26,13 @@ impl Paths {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum CaptureState {
-    /// Turned off in settings or from the tray.
     Paused,
     /// Not signed in, or not in the Data Surveyors.
     Idle,
     /// Star Citizen isn't running (or is minimised): nothing is captured.
     NoGame,
-    /// Sampling frames, no terminal in view.
     Watching,
-    /// OCR running on a steady frame.
     Reading,
-    /// A terminal was read on the last steady frame.
     Terminal,
     Error,
 }
@@ -61,7 +57,7 @@ pub struct AppState {
     pub recent: Mutex<Recent>,
     pub ocr: Mutex<Arc<dyn OcrEngine>>,
     pub capture_status: Mutex<CaptureStatus>,
-    /// Pokes the capture loop when settings change (pause/resume, source).
+    /// Pokes the capture loop when settings change (pause/resume).
     pub capture_wake: (Mutex<u64>, Condvar),
 }
 
@@ -71,7 +67,6 @@ impl AppState {
         Some(api::Client::new(&base, &key))
     }
 
-    /// The server and key requests go to, if signed in.
     pub fn api_target(&self) -> Option<(String, String)> {
         let key = self.api_key.guard().clone()?;
         Some((self.settings.guard().api_base.clone(), key))

@@ -8,10 +8,8 @@ use serde::{Deserialize, Serialize};
 /// Container sizes the game uses, in SCU. Readings and reports only ever carry these.
 pub const CARGO_SIZES: [u32; 7] = [1, 2, 4, 8, 16, 24, 32];
 
-/// Scope a key needs to file reports (Motherlode grants it to Data Surveyors members).
 pub const MARKET_REPORTS_WRITE: &str = "market-reports:write";
 
-/// Most lines one terminal report may carry.
 pub const MAX_REPORT_LINES: usize = 100;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -24,7 +22,6 @@ pub enum Side {
     Sell,
 }
 
-/// Normalised (0..1) rectangle relative to the captured frame.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct NormRect {
     pub x: f32,
@@ -42,7 +39,6 @@ impl NormRect {
         NormRect { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
     }
 
-    /// Grows the rect by `px`/`py` (normalised) on each side, clamped to the frame.
     pub fn pad(self, px: f32, py: f32) -> NormRect {
         let x0 = (self.x - px).max(0.0);
         let y0 = (self.y - py).max(0.0);
@@ -52,16 +48,12 @@ impl NormRect {
     }
 }
 
-/// One OCR'd value with where it came from.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Field<T> {
     pub value: Option<T>,
-    /// Raw OCR text, before parsing.
     pub text: String,
-    /// 0..1. The UI flags anything below ~0.6.
     pub confidence: f32,
-    /// Crop file on disk, if one was kept.
     pub crop: Option<String>,
     pub rect: Option<NormRect>,
 }
@@ -81,31 +73,24 @@ impl<T> Default for Field<T> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TerminalSource {
-    /// Location name read off the screen.
     Screen,
-    /// The terminal the player last confirmed.
     Last,
 }
 
-/// One commodity line from a terminal screen, waiting in the review queue.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Reading {
     pub id: String,
-    /// Lines from the same terminal screen share this; they're filed together.
     pub screen_id: String,
     pub created_at: DateTime<Utc>,
     /// When the values were last seen on screen: the report's `observedAt`.
     pub updated_at: DateTime<Utc>,
-    /// Bumped each time a later OCR pass updates the reading.
     pub revision: u32,
     pub side: Side,
     pub terminal_id: Option<String>,
     pub terminal_source: Option<TerminalSource>,
-    /// The location name as read (YOUR INVENTORIES), for the UI.
     #[serde(default)]
     pub location_text: Option<String>,
-    /// Commodity id from Motherlode's list (value) plus the name as read (text).
     pub commodity: Field<String>,
     /// Several commodities share this game name (e.g. "Construction Materials"):
     /// the player picks one. Empty when the name matched a single commodity.
@@ -117,13 +102,11 @@ pub struct Reading {
     pub quantity: Field<f64>,
     /// Buy side only: container sizes in stock.
     pub sizes: Field<Vec<u32>>,
-    /// Full-resolution frame the crops came from.
     pub frame: Option<String>,
     pub frame_width: u32,
     pub frame_height: u32,
 }
 
-/// What the player confirmed for one line in the review UI.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Confirmation {
@@ -132,9 +115,7 @@ pub struct Confirmation {
     pub commodity_id: String,
     pub side: Side,
     pub price: Option<i64>,
-    /// Buy side only.
     pub quantity: Option<f64>,
-    /// Buy side only.
     pub sizes: Vec<u32>,
     /// When these values were last seen on screen. Filled in by the core from
     /// the reading, not taken from the UI.
@@ -185,7 +166,6 @@ pub struct TerminalReport {
 }
 
 impl TerminalReport {
-    /// Confirmed lines (all for one terminal) → reports of at most MAX_REPORT_LINES.
     /// Buy and sell for the same commodity merge into one line.
     pub fn build(terminal_id: &str, observed_at: DateTime<Utc>, items: &[Confirmation]) -> Result<Vec<TerminalReport>, String> {
         let mut lines: BTreeMap<&str, ReportLine> = BTreeMap::new();
@@ -193,7 +173,6 @@ impl TerminalReport {
             let line = lines
                 .entry(&c.commodity_id)
                 .or_insert_with(|| ReportLine { commodity_id: c.commodity_id.clone(), ..Default::default() });
-            // Buy and sell rows of one commodity share a line: the later read wins.
             line.observed_at = line.observed_at.max(c.observed_at);
             match c.side {
                 Side::Sell => {
@@ -239,7 +218,6 @@ pub enum ReportStatus {
     Failed,
 }
 
-/// A rejected line in a 400 response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LineError {
@@ -247,15 +225,12 @@ pub struct LineError {
     pub error: String,
 }
 
-/// A confirmed terminal report on its way to Motherlode.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OutboxItem {
     pub id: String,
     pub reading_ids: Vec<String>,
-    /// For the status list: "Orison - Admin".
     pub terminal_label: String,
-    /// Commodity names, in the same order as `report.lines`.
     pub line_labels: Vec<String>,
     pub report: TerminalReport,
     pub status: ReportStatus,
@@ -266,7 +241,6 @@ pub struct OutboxItem {
     pub next_attempt_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub sent_at: Option<DateTime<Utc>>,
-    /// Motherlode's id for the batch, once sent.
     pub report_id: Option<String>,
 }
 
@@ -309,14 +283,12 @@ impl Commodity {
 pub struct CommodityTerminal {
     pub id: String,
     pub name: String,
-    /// The place's in-game (starmap) name, as the terminal prints it.
     pub location: String,
     pub place: Option<String>,
     pub system: String,
 }
 
 impl CommodityTerminal {
-    /// "Pyro Gateway - Admin"
     pub fn label(&self) -> String {
         format!("{} - {}", self.location, self.name)
     }

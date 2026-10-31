@@ -1,11 +1,7 @@
-// Duplicate readings. A terminal screen stays up for a while, the player
-// scrolls, looks away and back: the same row gets read many times. Two checks:
-//   - the row's crop looks the same as one seen recently (perceptual hash):
-//     skip it before spending any OCR on it;
-//   - same terminal + commodity + side + values within the window: one reading.
-//     Different values for a reading still in the queue update that reading.
-// Confirmed and rejected rows stay in the window too, so the same row isn't
-// queued again while it's still on screen; changed values are a new reading.
+// The same row gets read many times while a terminal stays up. A near-identical
+// crop is skipped before OCR; the same terminal + commodity + side + values within
+// the window is one reading, and new values update a queued one. Confirmed and
+// rejected rows stay in the window, so they aren't queued again.
 
 use std::time::{Duration, Instant};
 
@@ -20,7 +16,6 @@ const SAME_CROP: u32 = 4;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Key {
     pub terminal: Option<String>,
-    /// Commodity id, or the name as read if it matched none.
     pub commodity: String,
     pub side: Side,
 }
@@ -53,9 +48,7 @@ struct Entry {
 #[derive(Debug, PartialEq)]
 pub enum Verdict {
     New,
-    /// Already have this one (the reading's id).
     Duplicate(String),
-    /// Same row, new values: this reading should be updated if still queued.
     Update(String),
 }
 

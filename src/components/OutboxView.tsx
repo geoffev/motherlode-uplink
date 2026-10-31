@@ -39,7 +39,6 @@ function Line({ line, label, error }: { line: ReportLine; label: string; error?:
 }
 
 export function OutboxView({ items }: { items: OutboxItem[] }) {
-  /** Why a Retry click failed, per report. */
   const [retryErrors, setRetryErrors] = useState<Record<string, string>>({})
   const retry = (id: string) =>
     ipc.retryReport(id).then(

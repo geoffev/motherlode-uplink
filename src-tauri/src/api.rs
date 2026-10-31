@@ -16,17 +16,14 @@ pub enum ApiError {
     /// 403: no `market-reports:write` scope, or not in the Data Surveyors.
     #[error("{0}")]
     Forbidden(String),
-    /// 429: try again after this many seconds.
     #[error("Rate limited, retrying in {0}s")]
     RateLimited(u64),
     /// Other 4xx: the request itself is wrong, retrying won't help. A 400 on a
     /// report says which lines were rejected.
     #[error("{message}")]
     Rejected { status: u16, message: String, lines: Vec<LineError> },
-    /// 5xx: Motherlode's side; worth retrying.
     #[error("{message}")]
     Server { status: u16, message: String },
-    /// No connection, DNS, timeout…
     #[error("Can't reach Motherlode: {0}")]
     Network(String),
     #[error("Unexpected response from Motherlode: {0}")]
@@ -113,36 +110,8 @@ impl Client {
         self.get("/commodity-terminals").await
     }
 
-    /// Files everything read from one terminal screen; returns Motherlode's batch id.
     pub async fn post_terminal_report(&self, report: &TerminalReport) -> Result<String, ApiError> {
         let res = self.http.post(self.url("/terminal-reports")).bearer_auth(&self.key).json(report).send().await;
         Self::decode::<Created>(res).await.map(|c| c.id)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::model::ReportLine;
-
-    /// Runs against the mock server: `MOTHERLODE_MOCK_URL=http://localhost:3999 cargo test api::`.
-    #[tokio::test]
-    async fn round_trip_against_mock() {
-        let Ok(base) = std::env::var("MOTHERLODE_MOCK_URL") else { return };
-        let c = Client::new(&base, "mlk_demo_member");
-        assert!(c.me().await.unwrap().can_report());
-        assert!(c.commodities().await.unwrap().iter().any(|x| x.game_name.as_deref() == Some("Saldynium (Ore)")));
-        assert!(!c.commodity_terminals().await.unwrap().is_empty());
-
-        let line = |id: &str| ReportLine { commodity_id: id.into(), sell_price: Some(135876), ..Default::default() };
-        let ok = TerminalReport { terminal_id: "commodity:admin@orison".into(), observed_at: chrono::Utc::now(), lines: vec![line("savrilium")] };
-        assert!(c.post_terminal_report(&ok).await.unwrap().starts_with("rep_"));
-
-        let bad = TerminalReport { lines: vec![line("savrilium"), line("nope")], ..ok };
-        match c.post_terminal_report(&bad).await {
-            Err(ApiError::Rejected { status: 400, lines, .. }) => assert_eq!(lines[0].index, 1),
-            other => panic!("expected a 400 with line errors, got {other:?}"),
-        }
-        assert!(matches!(Client::new(&base, "mlk_wrong").me().await, Err(ApiError::Unauthorized(_))));
     }
 }

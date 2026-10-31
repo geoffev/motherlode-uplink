@@ -26,12 +26,10 @@ interface RowProps {
   crop: string | null
   confidence: number
   edited: boolean
-  /** Opens the crop enlarged. */
   onExpand?: (src: string, label: string) => void
   children: ReactNode
 }
 
-/** One field: label, the enlarged crop it was read from, and the editor. */
 export function FieldRow({ label, htmlFor, crop, confidence, edited, onExpand, children }: RowProps) {
   const low = !edited && confidence < LOW_CONFIDENCE
   return (

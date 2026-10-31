@@ -17,7 +17,6 @@ fn digitise(s: &str) -> String {
         .collect()
 }
 
-/// Splits off a K/M multiplier: "10.14K" → ("10.14", 1000).
 fn multiplier(s: &str) -> (&str, f64) {
     match s.chars().last() {
         Some('K' | 'k') => (&s[..s.len() - 1], 1e3),
@@ -26,7 +25,6 @@ fn multiplier(s: &str) -> (&str, f64) {
     }
 }
 
-/// Strips units and spaces: "10,138 aUEC/SCU" → "10,138".
 fn strip_units(s: &str) -> String {
     let up = s.to_uppercase();
     let mut t = up.replace("AUEC", "").replace("/SCU", "").replace("SCU", "").replace("UEC", "");
@@ -91,7 +89,6 @@ pub fn parse_quantity(text: &str) -> Option<(f64, bool)> {
     parse_number(text).map(|(n, exact)| ((n * 100.0).round() / 100.0, exact))
 }
 
-/// "1 2 4 8" / "1SCU 2SCU" → [1, 2, 4, 8]; anything not a game size is dropped.
 pub fn parse_sizes(text: &str) -> Vec<u32> {
     let mut out: Vec<u32> = digitise(&text.to_uppercase().replace("SCU", " "))
         .split(|c: char| !c.is_ascii_digit())

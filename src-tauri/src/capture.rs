@@ -1,32 +1,18 @@
-// Screen capture through OS APIs only. Star Citizen runs Easy Anti-Cheat: this
-// app never touches the game process: no injection, hooks or memory reads, and
-// it never opens a handle to it.
-//
-// Only the window of the StarCitizen.exe process is ever captured; when the
-// game isn't running, nothing is. The game's PIDs come from the system process
-// list (Windows: a Toolhelp snapshot; Linux/Wine: /proc, where Wine names the
-// process after the Windows executable), then its window is found by PID.
-//
-// Capture: Windows Graphics Capture through our own session (wgc.rs) on
-// Windows; xcap's X11 capture on Linux. xcap is also used to list windows,
-// which only asks the window manager. Still to add behind `Backend`: the
-// Wayland ScreenCast portal + PipeWire (`ashpd`, `pipewire`), persisting the
-// portal restore token.
+// Screen capture through OS APIs only: Star Citizen runs Easy Anti-Cheat, so this
+// never touches the game process (no injection, hooks, memory reads or process
+// handles). Only the StarCitizen.exe window is captured, found by PID from the
+// system process list. The Wayland ScreenCast portal is still to add behind `Backend`.
 
 use std::time::{Duration, Instant};
 
 use image::RgbaImage;
 
-/// The game's executable.
 pub const GAME_EXE: &str = "StarCitizen.exe";
-/// How often the game window is looked up again.
 const RESOLVE_EVERY: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CaptureError {
-    /// No StarCitizen.exe window: nothing is captured.
     GameNotRunning,
-    /// The game's window is minimised.
     GameMinimised,
     Failed(String),
 }
@@ -36,13 +22,10 @@ pub trait Backend {
     fn grab(&mut self) -> Result<RgbaImage, CaptureError>;
 }
 
-// ─── The game window ─────────────────────────────────────────────────────────
-
 #[derive(Default)]
 pub struct GameWindow {
     window: Option<xcap::Window>,
     resolved_at: Option<Instant>,
-    /// The open capture session, for the window it was made for.
     #[cfg(windows)]
     session: Option<crate::wgc::WindowCapture>,
 }
@@ -89,7 +72,6 @@ impl Backend for GameWindow {
             return Err(CaptureError::GameMinimised);
         }
         self.capture(&w).map_err(|e| {
-            // The game may have closed; look it up again next time.
             self.window = None;
             #[cfg(windows)]
             {
@@ -100,7 +82,6 @@ impl Backend for GameWindow {
     }
 }
 
-/// The game's main window: the largest window owned by a StarCitizen.exe process.
 fn find_game_window() -> Option<xcap::Window> {
     let pids = pids_named(GAME_EXE);
     if pids.is_empty() {

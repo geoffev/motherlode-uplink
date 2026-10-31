@@ -31,11 +31,9 @@ export default function App() {
     return h === 'sent' || h === 'settings' || h === 'faq' ? h : 'queue'
   })
   const [replacingKey, setReplacingKey] = useState(false)
-  /** An action that failed (sign out, catalog refresh), shown until dismissed. */
   const [notice, setNotice] = useState<string | null>(null)
   const [ocrMissing, setOcrMissing] = useState(false)
 
-  // Re-checked whenever the Tesseract path changes.
   useEffect(() => {
     ipc.getAppInfo().then(i => setOcrMissing(!!i.ocrError))
   }, [settings?.tesseractPath])

@@ -27,7 +27,6 @@ use windows::Win32::System::WinRT::Graphics::Capture::IGraphicsCaptureItemIntero
 use windows::Win32::System::WinRT::{RoInitialize, RO_INIT_MULTITHREADED};
 
 const FORMAT: DirectXPixelFormat = DirectXPixelFormat::B8G8R8A8UIntNormalized;
-/// How long the first grab waits for the compositor's first frame.
 const FIRST_FRAME_WAIT: Duration = Duration::from_millis(1500);
 
 pub struct WindowCapture {
@@ -90,7 +89,6 @@ impl WindowCapture {
         self.hwnd
     }
 
-    /// The window's latest picture.
     pub fn grab(&mut self) -> Result<RgbaImage, String> {
         let deadline = Instant::now() + if self.last.is_none() { FIRST_FRAME_WAIT } else { Duration::ZERO };
         loop {
@@ -111,7 +109,6 @@ impl WindowCapture {
         }
     }
 
-    /// Drains the pool, keeping only the most recent frame.
     fn newest_frame(&mut self) -> Option<Direct3D11CaptureFrame> {
         let mut newest: Option<Direct3D11CaptureFrame> = None;
         while let Ok(f) = self.pool.TryGetNextFrame() {

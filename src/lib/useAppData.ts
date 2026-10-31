@@ -10,7 +10,6 @@ function upsert<T extends { id: string; createdAt: string }>(list: T[], item: T)
   return next.sort(byNewest)
 }
 
-/** Everything the core pushes to the UI, kept in step with its events. */
 export function useAppData() {
   const [session, setSession] = useState<Session | null>(null)
   const [catalog, setCatalog] = useState<Catalog>({ commodities: [], terminals: [], fetchedAt: null })

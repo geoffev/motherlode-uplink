@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { errorText, ipc } from '../lib/ipc'
 
-/** Runs a saved screenshot through the same pipeline as live capture. */
 export function ScanImageButton() {
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)

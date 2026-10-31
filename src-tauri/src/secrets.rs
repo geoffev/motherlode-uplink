@@ -30,7 +30,6 @@ pub fn delete_api_key() -> Result<(), String> {
     }
 }
 
-/// "mlk_abcd…wxyz" — what the settings screen shows.
 pub fn mask(key: &str) -> String {
     let chars: Vec<char> = key.chars().collect();
     if chars.len() <= 12 {

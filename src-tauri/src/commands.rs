@@ -24,7 +24,6 @@ pub struct Session {
     signed_in: bool,
     masked_key: Option<String>,
     me: Option<Me>,
-    /// A 401 stopped sending; the player needs to paste a new key.
     key_rejected: bool,
 }
 
@@ -43,7 +42,6 @@ pub fn get_session(st: State<AppState>) -> Session {
     session_of(&st)
 }
 
-/// Fetches who the key belongs to, refreshing the cached copy.
 pub async fn refresh_me(app: &AppHandle) -> Result<Me, ApiError> {
     let st = app.state::<AppState>();
     let client = st.client().ok_or_else(|| ApiError::Unauthorized("Not signed in".into()))?;
@@ -108,8 +106,6 @@ pub fn sign_out(st: State<AppState>) -> Res<Session> {
     Ok(session_of(&st))
 }
 
-// ─── Catalog ─────────────────────────────────────────────────────────────────
-
 #[tauri::command]
 pub fn get_catalog(st: State<AppState>) -> Arc<Catalog> {
     st.catalog()
@@ -137,8 +133,6 @@ pub async fn refresh_catalog_inner(app: &AppHandle) -> Res<Arc<Catalog>> {
 pub async fn refresh_catalog(app: AppHandle) -> Res<Arc<Catalog>> {
     refresh_catalog_inner(&app).await
 }
-
-// ─── Review queue ────────────────────────────────────────────────────────────
 
 #[tauri::command]
 pub fn list_readings(st: State<AppState>) -> Vec<Reading> {
@@ -180,7 +174,6 @@ pub fn confirm_readings(app: AppHandle, st: State<AppState>, items: Vec<Confirma
     {
         let readings = st.readings.guard();
         for (terminal_id, group) in &by_terminal {
-            // When the prices were last seen on screen.
             let observed_at = group
                 .iter()
                 .filter_map(|c| readings.get(&c.reading_id).map(|r| r.updated_at))
@@ -246,8 +239,6 @@ pub fn reject_reading(app: AppHandle, st: State<AppState>, id: String) {
     let _ = app.emit("reading-removed", &id);
 }
 
-// ─── Outbox ──────────────────────────────────────────────────────────────────
-
 #[tauri::command]
 pub fn list_outbox(st: State<AppState>) -> Vec<OutboxItem> {
     st.outbox.guard().items()
@@ -260,8 +251,6 @@ pub fn retry_report(app: AppHandle, st: State<AppState>, id: String) -> Res<Outb
     let _ = app.emit("outbox", &item);
     Ok(item)
 }
-
-// ─── Capture ─────────────────────────────────────────────────────────────────
 
 #[tauri::command]
 pub fn get_capture_status(st: State<AppState>) -> CaptureStatus {
@@ -283,7 +272,6 @@ pub fn set_capture_enabled(app: AppHandle, enabled: bool) -> Res<Settings> {
     Ok(s)
 }
 
-/// Runs a screenshot file through the same pipeline as live capture.
 #[tauri::command]
 pub async fn scan_image(app: AppHandle, path: String) -> Res<ScanOutcome> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -294,8 +282,6 @@ pub async fn scan_image(app: AppHandle, path: String) -> Res<ScanOutcome> {
     .map_err(|e| e.to_string())?
 }
 
-// ─── Settings ────────────────────────────────────────────────────────────────
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppInfo {
@@ -305,7 +291,6 @@ pub struct AppInfo {
     ocr_engine: String,
     ocr_error: Option<String>,
     autostart: bool,
-    /// Release builds: the Motherlode server can't be changed in Settings.
     server_locked: bool,
 }
 
@@ -361,79 +346,4 @@ pub fn save_settings(app: AppHandle, settings: Settings) -> Res<Settings> {
     st.wake_capture();
     crate::tray::sync(&app);
     Ok(next)
-}
-
-// ─── Development helpers ─────────────────────────────────────────────────────
-
-/// Queues a made-up reading so the review UI can be worked on without the game.
-#[cfg(debug_assertions)]
-#[tauri::command]
-pub fn inject_demo_reading(app: AppHandle, st: State<AppState>) -> Res<Reading> {
-    use crate::model::{Field, NormRect, Side};
-    use image::{Rgba, RgbaImage};
-
-    let catalog = st.catalog();
-    let n = st.readings.guard().all().len();
-    let commodity = catalog.commodities.get(n % catalog.commodities.len().max(1)).cloned();
-    let mut frame = RgbaImage::from_pixel(1920, 1080, Rgba([12, 14, 20, 255]));
-    let rects = [
-        NormRect { x: 0.30, y: 0.30, w: 0.14, h: 0.035 },
-        NormRect { x: 0.46, y: 0.30, w: 0.08, h: 0.035 },
-        NormRect { x: 0.56, y: 0.30, w: 0.08, h: 0.035 },
-        NormRect { x: 0.66, y: 0.30, w: 0.06, h: 0.035 },
-    ];
-    for r in &rects {
-        let (x, y, w, h) = crate::vision::to_pixels(*r, 1920, 1080);
-        for py in y..y + h {
-            for px in x..x + w {
-                let on = (px / 7 + py / 9) % 3 == 0;
-                frame.put_pixel(px, py, if on { Rgba([232, 169, 32, 255]) } else { Rgba([30, 34, 44, 255]) });
-            }
-        }
-    }
-    let crops = st.crops();
-    let id = uuid::Uuid::new_v4().to_string();
-    let screen_id = uuid::Uuid::new_v4().to_string();
-    let dir = crops.screen_dir(&screen_id);
-    let save = |name: &str, r: NormRect| crops.save_crop(&dir, &format!("{id}-{name}"), &crate::vision::crop_rgba(&frame, r));
-    let field = |r: NormRect, name: &str, conf: f32| Field::<()> { value: None, text: String::new(), confidence: conf, crop: save(name, r), rect: Some(r) };
-    let (c, p, q, s) = (field(rects[0], "commodity", 0.92), field(rects[1], "price", 0.48), field(rects[2], "quantity", 0.81), field(rects[3], "sizes", 0.7));
-    let buy = n % 2 == 1;
-    let reading = Reading {
-        id,
-        screen_id,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        revision: 0,
-        side: if buy { Side::Buy } else { Side::Sell },
-        terminal_id: st.settings.guard().last_terminal_id.clone(),
-        terminal_source: None,
-        location_text: Some("ORISON".into()),
-        commodity: Field {
-            value: commodity.as_ref().map(|c| c.id.clone()),
-            text: commodity.as_ref().map(|c| c.label().to_uppercase()).unwrap_or_default(),
-            confidence: c.confidence,
-            crop: c.crop,
-            rect: c.rect,
-        },
-        commodity_candidates: vec![],
-        price: Field { value: Some(10138 + n as i64 * 17), text: "10,138".into(), confidence: p.confidence, crop: p.crop, rect: p.rect },
-        quantity: if buy {
-            Field { value: Some(29.0), text: "29".into(), confidence: q.confidence, crop: q.crop, rect: q.rect }
-        } else {
-            Field::empty()
-        },
-        sizes: if buy {
-            Field { value: Some(vec![1, 2, 4, 8]), text: "1 2 4 8".into(), confidence: s.confidence, crop: s.crop, rect: s.rect }
-        } else {
-            Field::empty()
-        },
-        frame: crops.save_frame(&dir, &frame),
-        frame_width: 1920,
-        frame_height: 1080,
-    };
-    st.readings.guard().upsert(reading.clone());
-    st.readings.guard().save();
-    let _ = app.emit("reading", &reading);
-    Ok(reading)
 }

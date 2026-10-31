@@ -1,8 +1,5 @@
-// Swappable OCR backend: image in, text + confidence out.
-//
-// The stand-in is the Tesseract CLI (run as a child process, so there are no
-// native libraries to link). The custom model being trained separately will
-// slot in as another `OcrEngine`, run through ONNX Runtime (`ort` crate).
+// OCR behind a swappable trait. Tesseract runs as a child process, so there are
+// no native libraries to link; a custom model can replace it as another `OcrEngine`.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -12,11 +9,9 @@ use image::GrayImage;
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct OcrText {
     pub text: String,
-    /// 0..1
     pub confidence: f32,
 }
 
-/// A word found in a larger image, with its box in that image's pixels.
 #[derive(Debug, Clone)]
 pub struct OcrWord {
     pub text: String,
@@ -39,11 +34,8 @@ impl OcrWord {
 /// What a crop is expected to contain; narrows the recogniser's alphabet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Charset {
-    /// Commodity and place names.
     Name,
-    /// Prices and quantities: digits, separators and K/M suffixes.
     Number,
-    /// Container sizes: digits and spaces.
     Sizes,
 }
 
@@ -60,13 +52,9 @@ pub trait OcrEngine: Send + Sync {
     fn available(&self) -> Result<(), String> {
         Ok(())
     }
-    /// One line of text (a field crop).
     fn read_line(&self, img: &GrayImage, charset: Charset) -> Result<OcrText, OcrError>;
-    /// Every word in a larger image, with boxes; used to find the terminal on screen.
     fn read_words(&self, img: &GrayImage) -> Result<Vec<OcrWord>, OcrError>;
 }
-
-// ─── Tesseract stand-in ──────────────────────────────────────────────────────
 
 pub struct Tesseract {
     bin: PathBuf,
@@ -83,7 +71,6 @@ impl Tesseract {
         candidates.into_iter().find(|p| p.is_file()).map(|bin| Tesseract { bin })
     }
 
-    /// Checks a file the player picked really is Tesseract; returns its version line.
     pub fn verify(path: &Path) -> Result<String, String> {
         if !path.is_file() {
             return Err(format!("{} doesn't exist", path.display()));
@@ -147,7 +134,6 @@ impl OcrEngine for Tesseract {
     }
 }
 
-/// Words on one line → text plus the weakest word's confidence.
 pub fn join_words(words: &[OcrWord]) -> OcrText {
     let text = words.iter().map(|w| w.text.as_str()).collect::<Vec<_>>().join(" ");
     let confidence = words.iter().map(|w| w.confidence).fold(f32::INFINITY, f32::min);
@@ -185,9 +171,6 @@ fn hide_console(cmd: &mut Command) {
 #[cfg(not(windows))]
 fn hide_console(_: &mut Command) {}
 
-// ─── No engine ───────────────────────────────────────────────────────────────
-
-/// Used when no OCR engine is installed; the UI says what to do about it.
 pub struct Unavailable(pub String);
 
 impl OcrEngine for Unavailable {

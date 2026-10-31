@@ -22,15 +22,12 @@ use crate::state::{AppState, CaptureState, CaptureStatus};
 use crate::vision;
 use crate::util::Guard;
 
-/// Thumbnail height for change detection.
 const THUMB_H: u32 = 180;
-/// Consecutive near-identical thumbnails before a frame counts as steady.
 const STEADY_FRAMES: u32 = 3;
 /// Bits (of 256) two thumbnails may differ by and still be "the same picture".
 const STEADY_BITS: u32 = 6;
 /// How different a steady frame must be from the last one read to read it again.
 const CHANGED_BITS: u32 = 10;
-/// Line height field crops are resampled to before OCR.
 const FIELD_H: u32 = 48;
 
 #[derive(Debug, Serialize)]
@@ -54,7 +51,6 @@ fn set_status(app: &AppHandle, state: CaptureState, message: Option<String>, sou
     }
 }
 
-/// Shown when the capture loop crashed and is being restarted.
 pub fn report_crash(app: &AppHandle, what: &str) {
     set_status(app, CaptureState::Error, Some(format!("Capture stopped unexpectedly and is restarting ({what})")), "");
 }
@@ -62,7 +58,6 @@ pub fn report_crash(app: &AppHandle, what: &str) {
 const NOT_RUNNING: &str = "Star Citizen isn't running, so nothing is being recorded.";
 const MINIMISED: &str = "Star Citizen is minimised, so nothing is being recorded.";
 
-/// The capture loop. Runs on its own thread for the life of the app.
 pub fn run_capture(app: AppHandle) {
     let mut backend: Option<Box<dyn capture::Backend>> = None;
     let mut last_thumb: Option<vision::Hash> = None;
@@ -149,7 +144,6 @@ fn thumbnail_hash(frame: &RgbaImage) -> vision::Hash {
     vision::dhash(&vision::brightness(&small))
 }
 
-/// One OCR'd field from a crop of the full-resolution frame.
 fn read_field(ocr: &dyn OcrEngine, gray: &image::GrayImage, rect: NormRect, charset: Charset) -> (String, f32) {
     let crop = vision::crop_gray(gray, rect);
     match ocr.read_line(&vision::prepare_line(&crop, FIELD_H), charset) {
@@ -207,14 +201,12 @@ fn read_number(
     }
 }
 
-/// Finds the terminal: OCR of the whole frame, resampled to LOCATE_H.
 pub fn locate_frame(ocr: &dyn OcrEngine, gray: &image::GrayImage, catalog: &crate::model::Catalog) -> Result<Option<detect::Located>, String> {
     let (locate_img, bin) = locate_input(gray);
     let words = ocr.read_words(&bin).map_err(|e| e.to_string())?;
     Ok(detect::locate(&words, &locate_img, catalog))
 }
 
-/// The frame at LOCATE_H, and the black-on-white copy OCR reads.
 pub fn locate_input(gray: &image::GrayImage) -> (image::GrayImage, image::GrayImage) {
     let locate_img = vision::resize_to_height(gray, LOCATE_H);
     // A window about two text lines across, at LOCATE_H.
@@ -222,7 +214,6 @@ pub fn locate_input(gray: &image::GrayImage) -> (image::GrayImage, image::GrayIm
     (locate_img, bin)
 }
 
-/// Reads one full-resolution frame. Used by the live loop and by "Read a screenshot".
 pub fn process_frame(app: &AppHandle, frame: &RgbaImage) -> Result<ScanOutcome, String> {
     let st = app.state::<AppState>();
     let ocr = st.ocr();
@@ -235,7 +226,7 @@ pub fn process_frame(app: &AppHandle, frame: &RgbaImage) -> Result<ScanOutcome, 
     out.terminal_found = true;
     out.rows = located.rows.len();
 
-    // §4: the location on screen first, then the terminal last confirmed.
+    // The location on screen first, then the terminal last confirmed.
     let last_terminal = st.settings.guard().last_terminal_id.clone();
     let (terminal_id, terminal_source) = match (located.terminal_ids.first(), &last_terminal) {
         (Some(t), _) => (Some(t.clone()), Some(TerminalSource::Screen)),
@@ -317,7 +308,6 @@ pub fn process_frame(app: &AppHandle, frame: &RgbaImage) -> Result<ScanOutcome, 
     Ok(out)
 }
 
-/// A queued reading seen again unchanged: move its observed time forward.
 fn touch(app: &AppHandle, id: &str, at: chrono::DateTime<Utc>) {
     let st = app.state::<AppState>();
     let updated = {
@@ -381,7 +371,6 @@ fn read_row(ocr: &dyn OcrEngine, gray: &image::GrayImage, row: &LocatedRow, cata
         rect: price_f.rect,
     };
 
-    // Quantity and sizes only exist on the buy side.
     let quantity = number(row.quantity, &row.quantity_text, &parse::parse_quantity);
     let sizes = match (row.side, row.sizes) {
         (Side::Sell, _) => Field::empty(),
@@ -413,9 +402,4 @@ fn read_row(ocr: &dyn OcrEngine, gray: &image::GrayImage, row: &LocatedRow, cata
         frame_width: 0,
         frame_height: 0,
     }
-}
-
-#[cfg(test)]
-pub fn read_row_for_test(ocr: &dyn OcrEngine, gray: &image::GrayImage, row: &LocatedRow, catalog: &crate::model::Catalog) -> Reading {
-    read_row(ocr, gray, row, catalog)
 }

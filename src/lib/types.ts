@@ -26,7 +26,6 @@ export interface Reading {
   side: Side
   terminalId: string | null
   terminalSource: 'screen' | 'last' | null
-  /** The location as read under YOUR INVENTORIES. */
   locationText: string | null
   commodity: Field<string>
   /** Several commodities share the name read; the player picks one. */
@@ -139,7 +138,6 @@ export interface AppInfo {
   ocrEngine: string
   ocrError: string | null
   autostart: boolean
-  /** Release builds: the Motherlode server is fixed. */
   serverLocked: boolean
 }
 

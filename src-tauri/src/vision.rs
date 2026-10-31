@@ -15,7 +15,6 @@ pub fn brightness(img: &RgbaImage) -> GrayImage {
     })
 }
 
-/// Resample so the image is `h` pixels tall, keeping the aspect ratio.
 pub fn resize_to_height(img: &GrayImage, h: u32) -> GrayImage {
     let w = ((img.width() as f64) * (h as f64) / (img.height().max(1) as f64)).round().max(1.0) as u32;
     let filter = if h < img.height() { FilterType::Triangle } else { FilterType::CatmullRom };
@@ -55,7 +54,6 @@ pub fn otsu(img: &GrayImage, floor: u8) -> u8 {
     best_t.max(floor)
 }
 
-/// Bright text → black on white, what Tesseract reads best.
 pub fn to_dark_text(img: &GrayImage, t: u8) -> GrayImage {
     GrayImage::from_fn(img.width(), img.height(), |x, y| {
         Luma([if img.get_pixel(x, y).0[0] > t { 0 } else { 255 }])
@@ -94,7 +92,6 @@ pub fn white_border(img: &GrayImage, px: u32) -> GrayImage {
     out
 }
 
-/// Prepares a single text line for OCR: fixed height, binarised, bordered.
 pub fn prepare_line(img: &GrayImage, target_h: u32) -> GrayImage {
     let scaled = resize_to_height(img, target_h);
     let t = otsu(&scaled, 90);

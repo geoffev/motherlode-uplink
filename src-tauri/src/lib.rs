@@ -8,8 +8,6 @@ mod ocr;
 mod outbox;
 mod parse;
 mod pipeline;
-#[cfg(test)]
-mod sample_report;
 mod secrets;
 mod settings;
 mod state;
@@ -27,7 +25,6 @@ use tauri::{Manager, WindowEvent};
 use crate::state::{AppState, CaptureState, CaptureStatus, Paths};
 use crate::util::Guard;
 
-/// Passed by autostart: stay in the tray.
 const MINIMIZED_FLAG: &str = "--minimized";
 
 fn init_state(app: &tauri::App) -> Result<AppState, Box<dyn std::error::Error>> {
@@ -125,7 +122,6 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Closing the window keeps the app running in the tray.
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let _ = window.hide();
@@ -149,18 +145,13 @@ pub fn run() {
             commands::get_app_info,
             commands::get_settings,
             commands::save_settings,
-            #[cfg(debug_assertions)]
-            commands::inject_demo_reading,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
-/// How long a crashed background loop waits before starting again.
 const RESTART_AFTER: std::time::Duration = std::time::Duration::from_secs(3);
 
-/// The capture loop, restarted if it ever panics, so recording never stops
-/// without the player being told.
 fn supervise_capture(app: tauri::AppHandle) {
     loop {
         let handle = app.clone();
@@ -173,8 +164,6 @@ fn supervise_capture(app: tauri::AppHandle) {
     }
 }
 
-/// The send queue, restarted if it ever panics. Reports are saved on disk, so
-/// nothing queued is lost.
 async fn supervise_outbox(app: tauri::AppHandle, wake: outbox::Wake) {
     loop {
         match tauri::async_runtime::spawn(outbox::run(app.clone(), wake.clone())).await {
@@ -193,7 +182,6 @@ fn panic_message(panic: &(dyn std::any::Any + Send)) -> String {
         .unwrap_or_else(|| "unknown error".into())
 }
 
-/// Downloads and installs an update in the background; it applies on next start.
 #[cfg(not(debug_assertions))]
 async fn check_for_update(app: tauri::AppHandle) {
     use tauri_plugin_updater::UpdaterExt;

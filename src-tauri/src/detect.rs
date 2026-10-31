@@ -3,8 +3,7 @@
 // fixed pixel positions, so any resolution, aspect ratio or UI scale reads the
 // same way (lib/screen-scan/ocr-engine.ts `locatePanel` uses the same idea).
 //
-// The terminal (samples/1920x1080_orison_demand-and-stock.png) shows both sides
-// at once:
+// The terminal shows both sides at once:
 //
 //   COMMODITIES                                       CURRENT BALANCE
 //   YOUR INVENTORIES                     SHOP INVENTORY
@@ -18,7 +17,7 @@
 //
 // IN DEMAND rows are the sell side; only their price is the terminal's (the SCU
 // and boxes are the player's own cargo). IN STOCK rows are the buy side: price,
-// shop quantity, stock level, cargo sizes. YOUR INVENTORIES names the location.
+// shop quantity, cargo sizes. YOUR INVENTORIES names the location.
 // The middle of the screen is the game world, so each list is bounded by its
 // own labels and its right-aligned prices.
 
@@ -78,14 +77,12 @@ enum Tok {
     /// "¤135,876/SCU": a price per SCU (the number with the unit glued on).
     /// Holds the number part only.
     PerScu(String),
-    /// A bare number.
     Number(String),
     /// "85SCU", "12,000SCU": a quantity with the unit glued on (no slash).
     /// Holds the number part only.
     NumScu(String),
     /// "SCU" or "(SCU)" on its own: the unit of the number before it.
     Scu,
-    /// A word of letters (name candidates and labels).
     Alpha(String),
     Other,
 }
@@ -155,7 +152,6 @@ fn tokenise(text: &str) -> Tok {
     Tok::Other
 }
 
-/// A commodity name's best match: one id, or several when they share a game name.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NameMatch {
     pub ids: Vec<String>,
@@ -171,22 +167,17 @@ pub struct LocatedRow {
     pub commodity: Option<NameMatch>,
     pub price: Option<NormRect>,
     pub price_text: Option<String>,
-    /// Buy side only.
     pub quantity: Option<NormRect>,
     pub quantity_text: Option<String>,
-    /// Buy side only.
     pub sizes: Option<NormRect>,
     pub sizes_found: Vec<u32>,
-    /// Lowest word confidence in the row, from the locate pass.
     pub confidence: f32,
 }
 
 #[derive(Debug, Clone)]
 pub struct Located {
     pub rows: Vec<LocatedRow>,
-    /// The location as read under YOUR INVENTORIES.
     pub location_text: Option<String>,
-    /// Commodity terminals at that location (several in a few cities).
     pub terminal_ids: Vec<String>,
 }
 
@@ -208,7 +199,6 @@ impl Ctx {
     }
 }
 
-/// A phrase's box on screen, in locate-image pixels.
 #[derive(Debug, Clone, Copy)]
 struct Bbox {
     x0: f32,
@@ -225,7 +215,6 @@ fn median(mut v: Vec<f32>) -> f32 {
     v[v.len() / 2]
 }
 
-/// Commodity id(s) for a name as read, matched against the game's own names first.
 pub fn match_commodity(name: &str, catalog: &Catalog) -> Option<NameMatch> {
     let n = normalise(name);
     if n.len() < 3 {
@@ -256,7 +245,6 @@ pub fn match_commodity(name: &str, catalog: &Catalog) -> Option<NameMatch> {
     best
 }
 
-/// Commodity terminals at the location read on screen.
 pub fn match_location(text: &str, catalog: &Catalog) -> Vec<String> {
     let t = normalise(text);
     if t.len() < 3 {
@@ -275,7 +263,6 @@ pub fn match_location(text: &str, catalog: &Catalog) -> Vec<String> {
     ids.into_iter().map(|x| x.id.clone()).collect()
 }
 
-/// Words → lines, by vertical centre, each sorted left to right.
 fn group_lines<'a>(words: &[&'a OcrWord], tol: f32) -> Vec<Vec<&'a OcrWord>> {
     let mut sorted: Vec<&OcrWord> = words.to_vec();
     sorted.sort_by(|a, b| a.cy().partial_cmp(&b.cy()).unwrap());
@@ -326,7 +313,6 @@ fn first_phrase(lines: &[Vec<&OcrWord>], phrase: &str, lh: f32) -> Option<Bbox> 
     find_phrase(lines, phrase, lh).into_iter().min_by(|a, b| a.y0.partial_cmp(&b.y0).unwrap())
 }
 
-/// One list on the terminal: where it is, and which side its rows are.
 struct Region {
     side: Side,
     x0: f32,
@@ -488,7 +474,6 @@ fn join_split_numbers(words: &[OcrWord], lh: f32) -> Vec<OcrWord> {
     out
 }
 
-/// The leading run of name words on a line: letters only, closely spaced, not labels.
 fn name_words<'a>(line: &[&'a OcrWord], lh: f32) -> Vec<&'a OcrWord> {
     // A stock-level line ("MAX INVENTGRY") is never a name.
     if line.iter().any(|w| is_inventory_word(&w.text)) {
@@ -544,11 +529,6 @@ fn read_rows(ctx: &Ctx, region: &Region, lines: &[Vec<&OcrWord>], catalog: &Cata
     let mut rows: Vec<Row> = Vec::new();
     for line in lines {
         let cy = line.iter().map(|w| w.cy()).sum::<f32>() / line.len() as f32;
-        #[cfg(test)]
-        if std::env::var_os("DETECT_DEBUG").is_some() {
-            let ws: Vec<String> = line.iter().map(|w| format!("{}@{:.0},{:.0}h{:.0}", w.text, w.x0, w.y0, w.h())).collect();
-            eprintln!("  [{:?}] cy {cy:.0} lh {lh:.1}: {}", region.side, ws.join("  "));
-        }
         // A long name wraps ("SHIP / AMMUNITION - / SIZE 2"): a line right under
         // the name, starting in line with it, carries on the name.
         // Measured in the name's own font, which is bigger than the labels.
@@ -584,10 +564,6 @@ fn read_rows(ctx: &Ctx, region: &Region, lines: &[Vec<&OcrWord>], catalog: &Cata
     for r in &mut rows {
         let text: String = r.name.iter().map(|w| w.text.as_str()).collect::<Vec<_>>().join(" ");
         r.commodity = match_commodity(&text, catalog);
-        #[cfg(test)]
-        if std::env::var_os("DETECT_DEBUG").is_some() {
-            eprintln!("  => row {text:?} {:?}, {} lines", r.commodity.as_ref().map(|m| &m.ids), r.lines.len());
-        }
     }
 
     let mut out = Vec::new();
@@ -620,7 +596,6 @@ fn read_rows(ctx: &Ctx, region: &Region, lines: &[Vec<&OcrWord>], catalog: &Cata
         };
 
         if region.side == Side::Buy {
-            // Shop quantity: a number followed by SCU, glued or not.
             for line in &r.lines {
                 let toks: Vec<Tok> = line.iter().map(|w| tokenise(&w.text)).collect();
                 let hit = (0..line.len()).find_map(|i| match &toks[i] {
@@ -634,7 +609,6 @@ fn read_rows(ctx: &Ctx, region: &Region, lines: &[Vec<&OcrWord>], catalog: &Cata
                     break;
                 }
             }
-            // Cargo sizes: the box numbers on the lines under AVAILABLE CARGO SIZE.
             let near = |w: &OcrWord, label: &str| strsim::levenshtein(&normalise(&w.text), label) <= label.len() / 4;
             if let Some(start) = r.lines.iter().position(|l| {
                 l.iter().any(|w| near(w, "CARGO") || near(w, "AVAILABLE")) && l.iter().any(|w| near(w, "SIZE"))
@@ -720,8 +694,7 @@ mod tests {
         }
     }
 
-    /// The words OCR finds on samples/1920x1080_orison_demand-and-stock.png,
-    /// at the positions they appear (1080p coordinates).
+    /// The words OCR finds on an Orison terminal at 1080p, where they appear.
     fn orison_words() -> Vec<OcrWord> {
         vec![
             w("COMMODITIES", 270.0, 127.0),

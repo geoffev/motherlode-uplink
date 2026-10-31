@@ -4,8 +4,6 @@ import type {
   AppInfo, CaptureStatus, Catalog, Confirmation, OutboxItem, Reading, ScanOutcome, Session, Settings,
 } from './types'
 
-// Thin typed wrappers over the Rust commands in src-tauri/src/commands.rs.
-
 export const ipc = {
   getSession: () => invoke<Session>('get_session'),
   signIn: (key: string) => invoke<Session>('sign_in', { key }),
@@ -29,9 +27,6 @@ export const ipc = {
   getAppInfo: () => invoke<AppInfo>('get_app_info'),
   getSettings: () => invoke<Settings>('get_settings'),
   saveSettings: (settings: Settings) => invoke<Settings>('save_settings', { settings }),
-
-  /** Debug builds only. */
-  injectDemoReading: () => invoke<Reading>('inject_demo_reading'),
 }
 
 export interface Events {
@@ -49,7 +44,6 @@ export function on<K extends keyof Events>(name: K, fn: (payload: Events[K]) => 
   return listen<Events[K]>(name, e => fn(e.payload))
 }
 
-/** A crop or frame on disk → URL the webview can load. */
 export const fileUrl = (path: string | null) => (path ? convertFileSrc(path) : undefined)
 
 /** Commands reject with the Rust error string. */

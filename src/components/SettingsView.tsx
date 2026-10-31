@@ -8,7 +8,6 @@ import { pickTesseract } from './OcrSetup'
 const URL_PRESETS = [
   { label: 'Production', url: 'https://cryon.rocks' },
   { label: 'Local dev', url: 'http://localhost:3000' },
-  { label: 'Mock server', url: 'http://localhost:3999' },
 ]
 
 interface Props {

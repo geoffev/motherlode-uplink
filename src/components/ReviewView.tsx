@@ -261,7 +261,6 @@ interface DetailProps {
 function Detail(p: DetailProps) {
   const { reading: r, resolved: v } = p
   const [hover, setHover] = useState<string | null>(null)
-  /** The screenshot, or one field's crop, open in the enlarged view. */
   const [enlarged, setEnlarged] = useState<null | 'frame' | { src: string; label: string }>(null)
   const expand = (src: string, label: string) => setEnlarged({ src, label })
   const priceFlash = useFlash(v.edited.price ? null : r.price.value)
@@ -421,7 +420,6 @@ function Detail(p: DetailProps) {
 
 interface FrameBox { key: string; label: string; rect: NormRect | null }
 
-/** The captured screen with the read regions outlined. */
 function Frame({ reading: r, boxes, hover }: { reading: Reading; boxes: FrameBox[]; hover: string | null }) {
   return (
     <span className="frame-inner" style={{ aspectRatio: `${r.frameWidth || 16} / ${r.frameHeight || 9}` }}>
@@ -440,7 +438,6 @@ function Frame({ reading: r, boxes, hover }: { reading: Reading; boxes: FrameBox
   )
 }
 
-/** Full-window view of the screenshot. Escape, the close button or a click outside closes it. */
 /** One field's crop, enlarged to fit the window; pixels stay sharp so misread digits are easy to check. */
 function CropLightbox({ src, label, onClose }: { src: string; label: string; onClose: () => void }) {
   const [aspect, setAspect] = useState(4)
@@ -505,9 +502,6 @@ function EmptyQueue({ status }: { status: CaptureStatus | null }) {
         {status?.state === 'noGame' && <p className="t-caption">{status.message}</p>}
         <div className="empty-actions">
           <ScanImageButton />
-          {import.meta.env.DEV && (
-            <button type="button" className="btn btn--ghost" onClick={() => ipc.injectDemoReading()}>Add demo reading</button>
-          )}
         </div>
       </div>
     </div>

@@ -50,7 +50,6 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Keeps the tray's checkbox in step with the setting.
 pub fn sync(app: &AppHandle) {
     let enabled = app.state::<AppState>().settings.guard().capture_enabled;
     if let Some(items) = app.try_state::<TrayItems>() {
@@ -58,7 +57,6 @@ pub fn sync(app: &AppHandle) {
     }
 }
 
-/// The tray tooltip says whether anything is being recorded.
 pub fn set_status(app: &AppHandle, status: &crate::state::CaptureStatus) {
     use crate::state::CaptureState;
     let line = match status.state {

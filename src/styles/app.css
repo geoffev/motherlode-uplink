@@ -20,11 +20,9 @@ select.input { padding-right: 6px; }
 .input--short { width: 100px; }
 .boot { height: 100%; background: var(--void-black); }
 
-/* Low OCR confidence: a subtle gold underline */
 .is-uncertain { border-bottom-color: color-mix(in srgb, var(--refined-gold) 75%, transparent); }
 .chips.is-uncertain { padding-bottom: 4px; border-bottom: 1px solid color-mix(in srgb, var(--refined-gold) 75%, transparent); }
 
-/* ── Shell ─────────────────────────────────────────────────────────────── */
 .app { display: flex; flex-direction: column; height: 100%; }
 .topbar {
   display: flex; align-items: center; gap: 20px; height: 52px; padding: 0 16px; flex: none;
@@ -64,7 +62,6 @@ select.input { padding-right: 6px; }
 .main { flex: 1; min-height: 0; padding: 16px; overflow: auto; }
 .main-view { height: 100%; }
 
-/* ── Review ────────────────────────────────────────────────────────────── */
 .review { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 16px; height: 100%; min-height: 0; }
 .queue { display: flex; flex-direction: column; min-height: 0; }
 .queue-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; }
@@ -128,7 +125,6 @@ select.input { padding-right: 6px; }
 }
 .detail-actions { display: flex; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--iron-line); }
 
-/* Combobox */
 .combo { position: relative; }
 .combo-list {
   position: absolute; z-index: 10; left: 0; right: 0; top: calc(100% + 2px); max-height: 260px; overflow-y: auto;
@@ -140,14 +136,12 @@ select.input { padding-right: 6px; }
 .combo-hint { color: var(--void-fog); font-size: 11px; text-transform: capitalize; }
 .combo-empty { padding: 6px 8px; }
 
-/* Empty states */
 .empty { display: flex; align-items: center; justify-content: center; min-height: 320px; height: 100%; }
 .empty-inner { max-width: 460px; padding: 24px; text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .empty-text { color: var(--dust-grey); margin: 0; }
 .empty-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 8px; }
 .scan-image { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; }
 
-/* ── Sign-in gate ──────────────────────────────────────────────────────── */
 .gate { display: flex; align-items: center; justify-content: center; min-height: 100%; padding: 24px; }
 .gate-card { width: 100%; max-width: 480px; }
 .gate-body { display: flex; flex-direction: column; gap: 12px; padding: 20px; }
@@ -156,7 +150,6 @@ select.input { padding-right: 6px; }
 .gate-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
 .form-error { margin: 0; color: var(--fault-red); font-size: 13px; }
 
-/* ── Sent ──────────────────────────────────────────────────────────────── */
 .report-list { list-style: none; margin: 0; padding: 0; }
 .report { padding: 10px 14px; border-bottom: 1px solid var(--iron-line); }
 .report:last-child { border-bottom: 0; }
@@ -178,7 +171,6 @@ select.input { padding-right: 6px; }
 .st--failed { color: var(--fault-red); }
 .st--failed::before { content: "✕ "; }
 
-/* ── Settings ──────────────────────────────────────────────────────────── */
 .settings { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .settings-body { display: flex; flex-direction: column; gap: 18px; padding: 16px; }
 .setting { display: flex; flex-direction: column; gap: 8px; }
@@ -188,7 +180,6 @@ select.input { padding-right: 6px; }
 .settings-actions { display: flex; align-items: center; gap: 10px; }
 .settings-foot { text-align: center; }
 
-/* ── FAQ ───────────────────────────────────────────────────────────────── */
 .faq { max-width: 760px; margin: 0 auto; }
 .faq-list { margin: 0; padding: 4px 16px; }
 .faq-item { padding: 14px 0; border-bottom: 1px solid var(--iron-line); }
@@ -202,7 +193,6 @@ select.input { padding-right: 6px; }
   .frame { max-width: 480px; }
 }
 
-/* Enlarged screenshot */
 .lightbox {
   position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 48px 24px 24px;
   background: color-mix(in srgb, var(--void-black) 92%, transparent); cursor: zoom-out;

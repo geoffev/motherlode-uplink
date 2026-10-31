@@ -5,12 +5,10 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-/// Motherlode's production server.
 pub const PRODUCTION_URL: &str = "https://cryon.rocks";
-/// Release builds only ever talk to production; the setting can't change it.
-/// Development builds can point anywhere (local dev, the mock server).
+/// Release builds only ever talk to production; development builds can point
+/// anywhere (e.g. a local dev server).
 pub const SERVER_LOCKED: bool = !cfg!(debug_assertions);
-/// Where a fresh install points: production, or the local dev server in development.
 const DEFAULT_URL: &str = if SERVER_LOCKED { PRODUCTION_URL } else { "http://localhost:3000" };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,15 +16,12 @@ const DEFAULT_URL: &str = if SERVER_LOCKED { PRODUCTION_URL } else { "http://loc
 pub struct Settings {
     pub api_base: String,
     pub capture_enabled: bool,
-    /// Frames sampled per second while watching for the terminal.
     pub capture_fps: f32,
     pub start_with_computer: bool,
     /// Where crops and frames are kept. None = the app data dir.
     pub crops_dir: Option<PathBuf>,
     pub crop_retention_days: u32,
-    /// Remembered so the next reading can suggest it.
     pub last_terminal_id: Option<String>,
-    /// Path to the Tesseract binary, if it isn't on PATH.
     pub tesseract_path: Option<PathBuf>,
 }
 
