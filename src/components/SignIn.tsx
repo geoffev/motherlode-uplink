@@ -77,11 +77,11 @@ export function NotEnrolled({ session, settings, onRefresh, onSignOut }: {
   return (
     <div className="gate">
       <div className="panel gate-card">
-        <div className="panel-head"><span className="t-label">Survey Corps</span></div>
+        <div className="panel-head"><span className="t-label">Data Surveyors</span></div>
         <div className="gate-body">
-          <h1 className="t-h2">Join the Survey Corps on Motherlode</h1>
+          <h1 className="t-h2">Join the Data Surveyors on Motherlode</h1>
           <p className="t-body gate-text">
-            Signed in as <strong>{session.me?.displayName}</strong>. Price reporting is open to Survey Corps members,
+            Signed in as <strong>{session.me?.displayName}</strong>. Price reporting is open to Data Surveyors members,
             the players who fill in Motherlode's missing price data. Sign-up isn't open yet; once your account is
             enabled, this screen turns into the reporter.
           </p>

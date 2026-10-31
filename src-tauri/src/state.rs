@@ -28,7 +28,7 @@ impl Paths {
 pub enum CaptureState {
     /// Turned off in settings or from the tray.
     Paused,
-    /// Not signed in, or not in the Survey Corps.
+    /// Not signed in, or not in the Data Surveyors.
     Idle,
     /// Star Citizen isn't running (or is minimised): nothing is captured.
     NoGame,
@@ -90,7 +90,7 @@ impl AppState {
         Crops { root: custom.unwrap_or_else(|| self.paths.data.join("crops")) }
     }
 
-    /// Readings are only taken when the key may file reports (Survey Corps members).
+    /// Readings are only taken when the key may file reports (Data Surveyors members).
     pub fn can_report(&self) -> bool {
         self.api_key.guard().is_some() && self.me.guard().as_ref().is_some_and(|m| m.can_report())
     }

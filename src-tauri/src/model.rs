@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// Container sizes the game uses, in SCU. Readings and reports only ever carry these.
 pub const CARGO_SIZES: [u32; 7] = [1, 2, 4, 8, 16, 24, 32];
 
-/// Scope a key needs to file reports (Motherlode grants it to Survey Corps members).
+/// Scope a key needs to file reports (Motherlode grants it to Data Surveyors members).
 pub const MARKET_REPORTS_WRITE: &str = "market-reports:write";
 
 /// Most lines one terminal report may carry.

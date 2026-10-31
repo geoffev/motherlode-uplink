@@ -78,7 +78,7 @@ pub fn run_capture(app: AppHandle) {
         let idle = if !settings.capture_enabled {
             Some((CaptureState::Paused, None))
         } else if !st.can_report() {
-            Some((CaptureState::Idle, Some("Sign in as a Survey Corps member to start reading".into())))
+            Some((CaptureState::Idle, Some("Sign in as a Data Surveyors member to start reading".into())))
         } else {
             None
         };

@@ -58,7 +58,7 @@ export function SettingsView({ settings, session, catalog, onSaved, onSignOut, o
               <button type="button" className="btn btn--ghost btn--sm" onClick={onSignOut}>Sign out</button>
             </div>
             <span className="t-caption">
-              {session.me ? <>Signed in as {session.me.displayName}{session.me.surveyCorps ? ' · Survey Corps' : ''}.</> : 'Not verified yet.'} Stored in your system keychain.
+              {session.me ? <>Signed in as {session.me.displayName}{session.me.surveyCorps ? ' · Data Surveyors' : ''}.</> : 'Not verified yet.'} Stored in your system keychain.
             </span>
           </div>
           {/* Release builds talk to production only; the choice is for development. */}

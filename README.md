@@ -1,6 +1,6 @@
 # Motherlode Price Reporter
 
-Desktop app (Tauri v2) for Motherlode's Survey Corps. It watches Star Citizen's
+Desktop app (Tauri v2) for Motherlode's Datarunners. It watches Star Citizen's
 commodity trade terminal, reads prices with local OCR, lets the player check
 each reading, and files confirmed ones to Motherlode as price reports.
 
@@ -14,34 +14,13 @@ for your OS, and **Tesseract** (the stand-in OCR engine) on PATH or set in Setti
 
 ```sh
 npm install
-npm run mock          # mock Motherlode API on http://localhost:3999 (see below)
 npm run tauri dev     # the app
 npm test              # Rust unit tests
 ```
 
-In the app: Settings → Motherlode URL → **Mock server**, then sign in with
-`mlk_demo_member`. In dev builds the empty queue has an **Add demo reading**
+In dev builds the empty queue has an **Add demo reading**
 button, and **Read a screenshot…** runs a saved screenshot through the same
 pipeline as live capture.
-
-### Mock API
-
-`mock/server.mjs` implements the endpoints the app uses (`/me`, `/commodities`,
-`/commodity-terminals`, `POST /terminal-reports`) the way Motherlode does
-(contract: Motherlode's OpenAPI spec, tag "Price Reporting"),
-including all-or-nothing batches with per-line errors, the `observedAt` window
-and the 60/min rate limit with `Retry-After`. Keys:
-
-| Key | Behaviour |
-|---|---|
-| `mlk_demo_member` | Survey Corps member: gets `market-reports:write`, reports succeed |
-| `mlk_demo_nocorps` | Not in the Survey Corps (app shows the join screen) |
-| anything else | 401 |
-
-`MOTHERLODE_MOCK_URL=http://localhost:3999 cargo test` also runs the API
-client against it.
-
-`FAIL_RATE=0.2 npm run mock` makes 20% of reports fail with a 500, to exercise retries.
 
 ## How it fits together
 
@@ -60,7 +39,6 @@ src-tauri/src/
   secrets.rs   API key in the OS keychain
   tray.rs      tray icon and menu
 src/           React review UI, settings, FAQ
-mock/          mock Motherlode API
 ```
 
 Data lives in the app data dir: `readings.json` (queue), `outbox.json`,
@@ -70,7 +48,7 @@ Data lives in the app data dir: `readings.json` (queue), `outbox.json`,
 
 ## Status
 
-Working: sign-in and Survey Corps gate, catalog sync, review queue with crops,
+Working: sign-in and Data Surveyors gate, catalog sync, review queue with crops,
 frame outlines, low-confidence underline, edit protection, keyboard shortcuts,
 Confirm all, persisted outbox with retry, settings, tray, single instance,
 autostart, crop retention.

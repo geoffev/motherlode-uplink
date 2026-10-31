@@ -13,7 +13,7 @@ pub enum ApiError {
     /// 401: the key is invalid or revoked. Stop sending until the player replaces it.
     #[error("{0}")]
     Unauthorized(String),
-    /// 403: no `market-reports:write` scope, or not in the Survey Corps.
+    /// 403: no `market-reports:write` scope, or not in the Data Surveyors.
     #[error("{0}")]
     Forbidden(String),
     /// 429: try again after this many seconds.
