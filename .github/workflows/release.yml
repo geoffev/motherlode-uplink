@@ -25,6 +25,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0 # full history and tags, for the list of changes
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
@@ -49,7 +51,30 @@ jobs:
           cd src-tauri
           cargo test --locked
 
+      # The same text for every release: what to download, then the commits
+      # since the previous version tag. Checksums are added after the build.
+      - name: Release notes
+        id: notes
+        shell: bash
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          prev=$(git describe --tags --abbrev=0 --match 'v*' "v$version^" 2>/dev/null || git describe --tags --abbrev=0 --match 'v*' HEAD^ 2>/dev/null || true)
+          range=${prev:+$prev..}HEAD
+          wiki="https://github.com/${{ github.repository }}/wiki"
+          {
+            echo 'body<<END_OF_NOTES'
+            echo "**Windows 10 / 11.** Download the \`…_x64-setup.exe\` installer below and run it."
+            echo "The app also needs Tesseract: see [Installing]($wiki/Installing)."
+            echo
+            echo 'Already installed? The app updates itself the next time it starts.'
+            echo
+            echo "### Changes${prev:+ since $prev}"
+            git log --no-merges --pretty='- %s (%h)' "$range"
+            echo 'END_OF_NOTES'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and publish
+        id: tauri
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -59,8 +84,22 @@ jobs:
           # __VERSION__ is filled in from tauri.conf.json.
           tagName: v__VERSION__
           releaseName: Motherlode Uplink v__VERSION__
-          releaseBody: See the wiki for installing and setting up.
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           prerelease: false
           # Uploads latest.json, which the in-app updater reads.
           includeUpdaterJson: true
+
+      # SHA-256 of each download, as SHA256SUMS.txt and in the release notes, so
+      # players can check a file is exactly what was published.
+      - name: Checksums
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARTIFACTS: ${{ steps.tauri.outputs.artifactPaths }}
+          VERSION: ${{ steps.tauri.outputs.appVersion }}
+          NOTES: ${{ steps.notes.outputs.body }}
+        run: |
+          node .github/scripts/release-checksums.mjs
+          gh release upload "v$VERSION" SHA256SUMS.txt --clobber
+          gh release edit "v$VERSION" --notes-file notes.md
