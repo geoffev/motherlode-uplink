@@ -1,0 +1,60 @@
+# Builds the Windows installers and publishes them as a GitHub Release.
+#
+# Runs when a version tag is pushed (e.g. `git tag v0.2.0 && git push origin v0.2.0`),
+# or by hand from the Actions tab. The release is created as a draft: check it,
+# then click "Publish release" on GitHub.
+#
+# Needs two repository secrets (Settings → Secrets and variables → Actions):
+#   TAURI_SIGNING_PRIVATE_KEY           the updater signing key (contents of the .key file)
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  its password
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # create the release and upload its files
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Test
+        run: |
+          npx tsc --noEmit
+          cd src-tauri
+          cargo test
+
+      - name: Build and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          # __VERSION__ is filled in from tauri.conf.json.
+          tagName: v__VERSION__
+          releaseName: Motherlode Uplink v__VERSION__
+          releaseBody: See the wiki for installing and setting up.
+          releaseDraft: true
+          prerelease: false
+          # Uploads latest.json, which the in-app updater reads.
+          includeUpdaterJson: true
