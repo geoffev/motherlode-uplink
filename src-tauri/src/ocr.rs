@@ -107,9 +107,12 @@ impl Tesseract {
 
         let mut cmd = Command::new(&self.bin);
         cmd.arg(file.path()).arg("stdout").args(["--psm", psm, "-l", "eng"]);
-        // Do not let a system TESSDATA_PREFIX redirect our private runtime.
+        // Tauri returns Windows verbatim paths (\\?\...), which Tesseract's
+        // C file APIs cannot open. Windows can set that directory as the child
+        // process's cwd, letting Tesseract open its model through a relative path.
+        // This also overrides any system TESSDATA_PREFIX.
         if let Some(data) = &self.tessdata {
-            cmd.arg("--tessdata-dir").arg(data);
+            cmd.current_dir(data).args(["--tessdata-dir", "."]);
         }
         if let Some(w) = whitelist {
             cmd.arg("-c").arg(format!("tessedit_char_whitelist={w}"));
@@ -240,6 +243,23 @@ mod tests {
         let override_engine = Tesseract::find(Some(&custom), Some(dir.path())).unwrap();
         assert_eq!(override_engine.bin, custom);
         assert_eq!(override_engine.tessdata, None);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn bundled_ocr_loads_model_from_verbatim_resource_path() {
+        // Exercise the real process and model, as tauri dev resolves them.
+        // prepare:ocr supplies these resources locally and in CI.
+        let resources = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("resources")
+            .canonicalize()
+            .expect("Run npm run prepare:ocr before Rust tests");
+        assert!(resources.as_os_str().to_string_lossy().starts_with(r"\\?\"));
+        let ocr = Tesseract::find(None, Some(&resources)).expect("Bundled Tesseract missing");
+        assert_eq!(ocr.bin, resources.join("tesseract/tesseract.exe"));
+        assert!(ocr.tessdata.is_some());
+        let blank = GrayImage::from_pixel(200, 60, image::Luma([255]));
+        assert!(ocr.read_words(&blank).expect("Bundled English model must load").is_empty());
     }
 
     #[test]

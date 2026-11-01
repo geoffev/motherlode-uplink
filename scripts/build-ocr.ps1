@@ -1,6 +1,7 @@
 param([string]$CMakePath)
 
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/ocr-common.ps1"
 $repo = Split-Path -Parent $PSScriptRoot
 $cache = Join-Path $repo '.tools/ocr'
 $sources = Join-Path $cache 'sources'
@@ -40,7 +41,7 @@ foreach ($package in $packages) {
     if (!(Test-Path -LiteralPath $archive)) {
         Invoke-WebRequest -UseBasicParsing -Uri $package.url -OutFile $archive
     }
-    if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $package.sha256) {
+    if ((Get-OcrSha256 $archive) -ne $package.sha256) {
         throw "Checksum mismatch for $archive. Remove that cached file and retry."
     }
     if (!(Test-Path -LiteralPath (Join-Path $sources $package.directory))) {
@@ -50,7 +51,7 @@ foreach ($package in $packages) {
 }
 
 # Rebuild when the recipe, source pins or selected compiler installation changes.
-$key = ((Get-FileHash -LiteralPath $PSCommandPath).Hash + (Get-FileHash -LiteralPath "$PSScriptRoot/ocr-sources.json").Hash + $vs.installationVersion + $vs.installationPath)
+$key = ((Get-OcrSha256 $PSCommandPath) + (Get-OcrSha256 "$PSScriptRoot/ocr-sources.json") + (Get-OcrSha256 "$PSScriptRoot/ocr-common.ps1") + $vs.installationVersion + $vs.installationPath)
 $stamp = Join-Path $native 'recipe.txt'
 if ((Test-Path -LiteralPath "$prefix/bin/tesseract.exe") -and (Test-Path -LiteralPath $stamp) -and (Get-Content -LiteralPath $stamp -Raw).Trim() -eq $key) {
     Write-Host 'Using cached minimal OCR build.'

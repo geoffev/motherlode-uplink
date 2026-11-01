@@ -1,6 +1,7 @@
 param([string]$CMakePath)
 
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/ocr-common.ps1"
 $repo = Split-Path -Parent $PSScriptRoot
 $cache = Join-Path $repo '.tools/ocr'
 $destination = Join-Path $repo 'src-tauri/resources/tesseract'
@@ -15,7 +16,7 @@ $model = Join-Path $cache 'eng.traineddata'
 if (!(Test-Path -LiteralPath $model)) {
     Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/eng.traineddata' -OutFile $model
 }
-if ((Get-FileHash -LiteralPath $model -Algorithm SHA256).Hash -ne '7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2') {
+if ((Get-OcrSha256 $model) -ne '7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2') {
     throw "Checksum mismatch for $model. Remove that cached file and retry."
 }
 
@@ -40,11 +41,12 @@ $manifest = @{
     englishModel = @{
         version = 'tessdata_fast 4.1.0'
         url = 'https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/eng.traineddata'
-        sha256 = (Get-FileHash -LiteralPath $model -Algorithm SHA256).Hash.ToLowerInvariant()
+        sha256 = Get-OcrSha256 $model
         license = 'Apache-2.0; see doc/LICENSE-tesseract.txt'
     }
-    executableSha256 = (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant()
-    recipeSha256 = (Get-FileHash -LiteralPath "$PSScriptRoot/build-ocr.ps1" -Algorithm SHA256).Hash.ToLowerInvariant()
+    executableSha256 = Get-OcrSha256 $executable
+    recipeSha256 = Get-OcrSha256 "$PSScriptRoot/build-ocr.ps1"
+    hashHelperSha256 = Get-OcrSha256 "$PSScriptRoot/ocr-common.ps1"
 }
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$destination/SOURCE-MANIFEST.json" -Encoding UTF8
 foreach ($package in $packages) {
