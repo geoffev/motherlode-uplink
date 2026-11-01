@@ -39,6 +39,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Prepare bundled OCR and verify English recognition
+        run: npm run prepare:ocr
+
       - name: Known vulnerabilities in npm packages
         run: npm audit --audit-level=high
 

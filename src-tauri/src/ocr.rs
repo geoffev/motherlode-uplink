@@ -58,17 +58,24 @@ pub trait OcrEngine: Send + Sync {
 
 pub struct Tesseract {
     bin: PathBuf,
+    tessdata: Option<PathBuf>,
 }
 
 impl Tesseract {
-    /// Settings path first, then PATH, then the usual Windows install location.
-    pub fn find(configured: Option<&Path>) -> Option<Tesseract> {
+    /// An explicit override wins; otherwise prefer the version shipped with the app.
+    pub fn find(configured: Option<&Path>, resources: Option<&Path>) -> Option<Tesseract> {
+        let bundled = resources.map(|p| p.join("tesseract/tesseract.exe"));
         let candidates = configured
             .map(Path::to_path_buf)
             .into_iter()
+            .chain(bundled)
             .chain(which::which("tesseract").ok())
             .chain(cfg!(windows).then(|| PathBuf::from(r"C:\Program Files\Tesseract-OCR\tesseract.exe")));
-        candidates.into_iter().find(|p| p.is_file()).map(|bin| Tesseract { bin })
+        candidates.into_iter().find(|p| p.is_file()).map(|bin| {
+            let tessdata = bin.parent().map(|p| p.join("tessdata"))
+                .filter(|p| p.join("eng.traineddata").is_file());
+            Tesseract { bin, tessdata }
+        })
     }
 
     pub fn verify(path: &Path) -> Result<String, String> {
@@ -100,6 +107,10 @@ impl Tesseract {
 
         let mut cmd = Command::new(&self.bin);
         cmd.arg(file.path()).arg("stdout").args(["--psm", psm, "-l", "eng"]);
+        // Do not let a system TESSDATA_PREFIX redirect our private runtime.
+        if let Some(data) = &self.tessdata {
+            cmd.arg("--tessdata-dir").arg(data);
+        }
         if let Some(w) = whitelist {
             cmd.arg("-c").arg(format!("tessedit_char_whitelist={w}"));
         }
@@ -188,8 +199,8 @@ impl OcrEngine for Unavailable {
     }
 }
 
-pub fn create(tesseract_path: Option<&Path>) -> std::sync::Arc<dyn OcrEngine> {
-    match Tesseract::find(tesseract_path) {
+pub fn create(tesseract_path: Option<&Path>, resources: Option<&Path>) -> std::sync::Arc<dyn OcrEngine> {
+    match Tesseract::find(tesseract_path, resources) {
         Some(t) => std::sync::Arc::new(t),
         None => std::sync::Arc::new(Unavailable(
             "Tesseract was not found. Install it, or set its path in Settings.".into(),
@@ -208,9 +219,27 @@ mod tests {
         if let Ok(git) = which::which("git") {
             assert!(Tesseract::verify(&git).is_err());
         }
-        if let Some(t) = Tesseract::find(None) {
+        if let Some(t) = Tesseract::find(None, None) {
             assert!(Tesseract::verify(&t.bin).unwrap().starts_with("tesseract"));
         }
+    }
+
+    #[test]
+    fn bundled_runtime_and_override_selection() {
+        let dir = tempfile::tempdir().unwrap();
+        let bundled = dir.path().join("tesseract");
+        std::fs::create_dir_all(bundled.join("tessdata")).unwrap();
+        std::fs::write(bundled.join("tesseract.exe"), b"").unwrap();
+        std::fs::write(bundled.join("tessdata/eng.traineddata"), b"").unwrap();
+        let automatic = Tesseract::find(None, Some(dir.path())).unwrap();
+        assert_eq!(automatic.bin, bundled.join("tesseract.exe"));
+        assert_eq!(automatic.tessdata, Some(bundled.join("tessdata")));
+
+        let custom = dir.path().join("custom.exe");
+        std::fs::write(&custom, b"").unwrap();
+        let override_engine = Tesseract::find(Some(&custom), Some(dir.path())).unwrap();
+        assert_eq!(override_engine.bin, custom);
+        assert_eq!(override_engine.tessdata, None);
     }
 
     #[test]

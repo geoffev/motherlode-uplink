@@ -38,7 +38,8 @@ fn init_state(app: &tauri::App) -> Result<AppState, Box<dyn std::error::Error>> 
     let catalog: model::Catalog = util::load_json(&paths.file("catalog.json")).unwrap_or_default();
     let me: Option<model::Me> = util::load_json(&paths.file("me.json"));
     let api_key = secrets::load_api_key();
-    let ocr = ocr::create(settings.tesseract_path.as_deref());
+    let resources = app.path().resource_dir()?;
+    let ocr = ocr::create(settings.tesseract_path.as_deref(), Some(&resources));
     log::info!("OCR engine: {}", ocr.name());
 
     Ok(AppState {

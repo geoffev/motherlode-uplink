@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "prepare:ocr": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-ocr.ps1",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",

@@ -126,12 +126,12 @@ export function SettingsView({ settings, session, catalog, onSaved, onSignOut, o
             <Checkbox checked={draft.startWithComputer} onChange={v => set('startWithComputer', v)}>Start with my computer (in the tray)</Checkbox>
           </div>
           <div className="setting">
-            <label className="t-label" htmlFor="s-tess">Tesseract (stand-in OCR)</label>
+            <label className="t-label" htmlFor="s-tess">Tesseract path override</label>
             <div className="setting-inline">
               <input
                 id="s-tess"
                 className="input"
-                placeholder="Found automatically on PATH"
+                placeholder="Automatic (bundled OCR on Windows)"
                 value={draft.tesseractPath ?? ''}
                 onChange={e => set('tesseractPath', e.target.value || null)}
               />

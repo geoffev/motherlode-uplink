@@ -329,7 +329,8 @@ pub fn save_settings(app: AppHandle, settings: Settings) -> Res<Settings> {
         if let Some(p) = &next.tesseract_path {
             crate::ocr::Tesseract::verify(p)?;
         }
-        *st.ocr.guard() = crate::ocr::create(next.tesseract_path.as_deref());
+        let resources = app.path().resource_dir().map_err(|e| e.to_string())?;
+        *st.ocr.guard() = crate::ocr::create(next.tesseract_path.as_deref(), Some(&resources));
     }
     if next.api_base != prev.api_base {
         // Another server: its catalog and the key's owner may differ.

@@ -29,3 +29,7 @@ samples
 
 # Tauri signer
 .tauri
+
+# Downloaded OCR runtime and local packaging tools
+.tools/
+src-tauri/resources/tesseract/

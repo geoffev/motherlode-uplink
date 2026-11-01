@@ -35,7 +35,7 @@ export function OcrSetupBanner({ settings, onSaved }: { settings: Settings; onSa
     <div className="banner banner--setup" role="status">
       <span>
         <strong>Tesseract isn't set up</strong>, so terminal prices can't be read yet.
-        {isWindows ? ' Install it, then point the app at tesseract.exe.' : ' Install it from your package manager (tesseract or tesseract-ocr).'}
+        {isWindows ? ' Reinstall the app to restore its bundled OCR, or browse to an existing tesseract.exe.' : ' Install it from your package manager (tesseract or tesseract-ocr).'}
         {error && <span className="is-error"> {error}</span>}
       </span>
       <span className="spacer" />

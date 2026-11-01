@@ -17,11 +17,11 @@ Windows 10 and 11. Linux isn't supported yet.
    [latest release](https://github.com/geoffev/motherlode-uplink/releases/latest) and run it.
    If Windows SmartScreen warns about an unknown publisher, choose
    **More info → Run anyway**.
-2. Install [Tesseract](https://tesseract-ocr.github.io/tessdoc/Installation.html),
-   the text reader the app uses. Keep its default folder
-   (`C:\Program Files\Tesseract-OCR`) and the app finds it on its own.
-3. Create an API key at [cryon.rocks/profile/developer](https://cryon.rocks/profile/developer)
+2. Create an API key at [cryon.rocks/profile/developer](https://cryon.rocks/profile/developer)
    and paste it into the app.
+
+Tesseract OCR and English language data are included in the Windows installer.
+They work offline and update with the app. A separate OCR installation isn't needed.
 
 The app updates itself when a new version is released. Each release lists
 SHA-256 checksums for its files. The [wiki](https://github.com/geoffev/motherlode-uplink/wiki)
@@ -35,15 +35,32 @@ are all welcome. Please open an issue before starting on anything large.
 ### Set up
 
 You need Rust (stable), Node 20+, the [Tauri prerequisites](https://tauri.app/start/prerequisites/)
-and Tesseract (see [Install](#install)).
+and Visual Studio C++ Build Tools with CMake on Windows (part of the Tauri prerequisites).
 
 ```sh
 npm install
+npm run prepare:ocr  # Windows: build and verify the bundled OCR runtime
 npm run tauri dev     # run the app, with live reload for the UI
 ```
 
 Development builds talk to `http://localhost:3000` by default; change the
 server under **Settings**. Release builds always use `https://cryon.rocks`.
+
+Windows installer builds run `prepare:ocr` automatically. Run it before development
+or Rust tests on a fresh checkout. It builds Tesseract 5.5.3 with Leptonica 1.87.0,
+libpng 1.6.59 and zlib 1.3.2 from SHA-256-pinned sources, using static linking.
+Only PNG support is enabled; no UB Mannheim/MSYS2 runtime DLLs are bundled.
+The English tessdata_fast 4.1.0 model is also pinned. The script verifies the
+executable's Windows imports, copies the exact source licenses, and checks English
+TSV recognition with system OCR paths removed. The first build takes a few minutes;
+later runs reuse the native build. CI does this automatically. Downloads, native
+builds and generated license/resource files are ignored by Git. To select CMake,
+run `powershell -File scripts/prepare-ocr.ps1 -CMakePath C:\path\to\cmake.exe`.
+Settings can override the executable; clear the override to use bundled OCR.
+Non-Windows development requires a system Tesseract installation.
+
+See [OCR redistribution review](scripts/OCR-COMPLIANCE.md) for versions, licenses
+and release verification requirements.
 
 To work on reading without the game, use **Read a screenshot…** on the empty
 review queue. It runs a saved screenshot of a terminal through the same pipeline

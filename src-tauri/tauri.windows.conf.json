@@ -1,0 +1,10 @@
+{
+  "build": {
+    "beforeBuildCommand": "npm run prepare:ocr && npm run build"
+  },
+  "bundle": {
+    "resources": {
+      "resources/tesseract/": "tesseract/"
+    }
+  }
+}

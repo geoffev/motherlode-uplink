@@ -45,6 +45,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Prepare bundled OCR and verify English recognition
+        run: npm run prepare:ocr
+
       - name: Test
         run: |
           npx tsc --noEmit
@@ -60,11 +63,10 @@ jobs:
           version=$(node -p "require('./src-tauri/tauri.conf.json').version")
           prev=$(git describe --tags --abbrev=0 --match 'v*' "v$version^" 2>/dev/null || git describe --tags --abbrev=0 --match 'v*' HEAD^ 2>/dev/null || true)
           range=${prev:+$prev..}HEAD
-          wiki="https://github.com/${{ github.repository }}/wiki"
           {
             echo 'body<<END_OF_NOTES'
             echo "**Windows 10 / 11.** Download the \`…_x64-setup.exe\` installer below and run it."
-            echo "The app also needs Tesseract: see [Installing]($wiki/Installing)."
+            echo 'Tesseract OCR and English language data are included; no separate OCR installation is needed.'
             echo
             echo 'Already installed? The app updates itself the next time it starts.'
             echo
