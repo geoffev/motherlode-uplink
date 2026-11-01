@@ -90,7 +90,7 @@ jobs:
           releaseDraft: true
           prerelease: false
           # Uploads latest.json, which the in-app updater reads.
-          includeUpdaterJson: true
+          uploadUpdaterJson: true
 
       # SHA-256 of each download, as SHA256SUMS.txt and in the release notes, so
       # players can check a file is exactly what was published.
