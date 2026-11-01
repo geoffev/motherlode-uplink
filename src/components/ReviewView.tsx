@@ -102,10 +102,10 @@ export function ReviewView({ readings, catalog, settings, status, active }: Prop
     const label = commodityLabel(name)
     const price = parsePriceInput(v.price)
     if (Number.isNaN(price)) return `${label}: the price isn't a number`
-    // Sell rows (IN DEMAND): only the price is the terminal's.
+    // Inventory buttons show accepted sizes, but inventory SCU is not demand.
     if (v.side === 'sell') {
       if (price == null) return `${label}: enter the price`
-      return { readingId: r.id, terminalId: v.terminalId, commodityId: name.id, side: 'sell', price, quantity: null, sizes: [] }
+      return { readingId: r.id, terminalId: v.terminalId, commodityId: name.id, side: 'sell', price, quantity: null, sizes: v.sizes }
     }
     const quantity = parseScuInput(v.quantity)
     if (Number.isNaN(quantity)) return `${label}: the stock isn't a number`
@@ -273,8 +273,8 @@ function Detail(p: DetailProps) {
     { key: 'price', label: 'Price', rect: r.price.rect },
     ...(sell ? [] : [
       { key: 'quantity', label: 'Stock', rect: r.quantity.rect },
-      { key: 'sizes', label: 'Sizes', rect: r.sizes.rect },
     ]),
+    { key: 'sizes', label: sell ? 'Accepted sizes' : 'Sizes', rect: r.sizes.rect },
   ]
   const hot = (key: string) => ({ onMouseEnter: () => setHover(key), onMouseLeave: () => setHover(null), onFocus: () => setHover(key) })
   const options = r.commodityCandidates.length
@@ -369,13 +369,15 @@ function Detail(p: DetailProps) {
                   </div>
                 </FieldRow>
               </div>
-              <div {...hot('sizes')}>
-                <FieldRow label="Sizes it has" crop={r.sizes.crop} confidence={r.sizes.confidence} edited={v.edited.sizes} onExpand={expand}>
-                  <SizeChips value={v.sizes} onChange={sizes => p.onEdit({ sizes })} uncertain={uncertain(r.sizes.confidence, v.edited.sizes)} />
-                </FieldRow>
-              </div>
             </>
           )}
+
+          <div {...hot('sizes')}>
+            <FieldRow label={sell ? 'Accepted sizes' : 'Sizes it has'} crop={r.sizes.crop} confidence={r.sizes.confidence} edited={v.edited.sizes} onExpand={expand}>
+              <SizeChips value={v.sizes} onChange={sizes => p.onEdit({ sizes })} uncertain={uncertain(r.sizes.confidence, v.edited.sizes)} />
+            </FieldRow>
+            {sell && <p className="t-caption field-note">Only sizes observed in your inventory; other sizes may also be accepted.</p>}
+          </div>
 
           <div className="field-row field-row--terminal">
             <label className="t-label field-label" htmlFor="f-terminal">Terminal</label>

@@ -22,8 +22,12 @@ function Line({ line, label, error }: { line: ReportLine; label: string; error?:
   return (
     <li className="report-line">
       <span className="report-line-name">{label || line.commodityId}</span>
-      {line.sellPrice != null && (
-        <span className="report-side"><span className="tag tag--sell">sell</span> <span className="t-data-sm">¤{fmtPrice(line.sellPrice)}</span></span>
+      {(line.sellPrice != null || line.sellCargoSizes) && (
+        <span className="report-side">
+          <span className="tag tag--sell">sell</span>
+          {line.sellPrice != null && <span className="t-data-sm">¤{fmtPrice(line.sellPrice)}</span>}
+          {line.sellCargoSizes && <SizeSquares sizes={line.sellCargoSizes} />}
+        </span>
       )}
       {(line.buyPrice != null || line.stockScu != null || line.buyCargoSizes) && (
         <span className="report-side">

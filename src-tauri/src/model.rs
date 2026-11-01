@@ -17,8 +17,8 @@ pub const MAX_REPORT_LINES: usize = 100;
 pub enum Side {
     /// The terminal sells to you (SHOP INVENTORY → IN STOCK): price, stock, sizes.
     Buy,
-    /// The terminal buys from you (IN DEMAND): only the price is the terminal's;
-    /// the SCU and boxes on that row are the player's own cargo.
+    /// The terminal buys from you (IN DEMAND): price and observed accepted sizes.
+    /// The SCU quantity is the player's cargo, not terminal demand.
     Sell,
 }
 
@@ -100,7 +100,7 @@ pub struct Reading {
     pub price: Field<i64>,
     /// Buy side only: SCU in stock.
     pub quantity: Field<f64>,
-    /// Buy side only: container sizes in stock.
+    /// Container sizes in stock (buy) or observed accepted from inventory (sell).
     pub sizes: Field<Vec<u32>>,
     pub frame: Option<String>,
     pub frame_width: u32,
@@ -176,10 +176,12 @@ impl TerminalReport {
             line.observed_at = line.observed_at.max(c.observed_at);
             match c.side {
                 Side::Sell => {
-                    if line.sell_price.is_some() {
+                    if line.sell_price.is_some() || line.sell_cargo_sizes.is_some() {
                         return Err(format!("{} is on the sell side twice", c.commodity_id));
                     }
                     line.sell_price = c.price;
+                    let sizes: Vec<u32> = CARGO_SIZES.iter().copied().filter(|s| c.sizes.contains(s)).collect();
+                    line.sell_cargo_sizes = (!sizes.is_empty()).then_some(sizes);
                 }
                 Side::Buy => {
                     if line.buy_price.is_some() || line.stock_scu.is_some() {
@@ -324,7 +326,10 @@ mod tests {
         let mut buy = conf("agricium", Side::Buy, 7047);
         buy.quantity = Some(1924.1349);
         buy.sizes = vec![8, 1, 3, 2];
-        let items = vec![conf("agricium", Side::Sell, 10138), buy, conf("tungsten", Side::Sell, 10260)];
+        let mut sell = conf("agricium", Side::Sell, 10138);
+        sell.sizes = vec![4, 1, 4, 3];
+        sell.quantity = Some(9.0);
+        let items = vec![sell, buy, conf("tungsten", Side::Sell, 10260)];
         let reports = TerminalReport::build("t", Utc::now(), &items).unwrap();
         assert_eq!(reports.len(), 1);
         let lines = &reports[0].lines;
@@ -332,8 +337,10 @@ mod tests {
         let a = &lines[0];
         assert_eq!((a.sell_price, a.buy_price, a.stock_scu), (Some(10138), Some(7047), Some(1924.13)));
         assert_eq!(a.buy_cargo_sizes, Some(vec![1, 2, 8]));
-        assert!(a.demand_scu.is_none() && a.sell_cargo_sizes.is_none());
+        assert!(a.demand_scu.is_none());
+        assert_eq!(a.sell_cargo_sizes, Some(vec![1, 4]));
         let json = serde_json::to_value(&reports[0]).unwrap();
+        assert_eq!(json["lines"][0]["sellCargoSizes"], serde_json::json!([1, 4]));
         assert_eq!(json["lines"][1], serde_json::json!({ "commodityId": "tungsten", "sellPrice": 10260 }));
         assert!(json["lines"][0].get("observedAt").is_none());
         assert!(json["observedAt"].is_string());

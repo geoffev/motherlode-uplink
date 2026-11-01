@@ -90,7 +90,8 @@ pub fn parse_quantity(text: &str) -> Option<(f64, bool)> {
 }
 
 pub fn parse_sizes(text: &str) -> Vec<u32> {
-    let mut out: Vec<u32> = digitise(&text.to_uppercase().replace("SCU", " "))
+    let buttons = text.split_whitespace().map(|t| t.split(['x', 'X', '×']).next().unwrap_or("")).collect::<Vec<_>>().join(" ");
+    let mut out: Vec<u32> = digitise(&buttons.to_uppercase().replace("SCU", " "))
         .split(|c: char| !c.is_ascii_digit())
         .filter_map(|t| t.parse::<u32>().ok())
         .filter(|n| CARGO_SIZES.contains(n))
@@ -128,5 +129,6 @@ mod tests {
         assert_eq!(parse_sizes("1 2 4 8"), vec![1, 2, 4, 8]);
         assert_eq!(parse_sizes("1SCU 32SCU 3"), vec![1, 32]);
         assert_eq!(parse_sizes("I6 24"), vec![16, 24]);
+        assert_eq!(parse_sizes("1x8 4 X2 16×24"), vec![1, 4, 16]);
     }
 }

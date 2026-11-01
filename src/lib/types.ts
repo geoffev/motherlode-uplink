@@ -22,7 +22,7 @@ export interface Reading {
   createdAt: string
   updatedAt: string
   revision: number
-  /** sell = IN DEMAND (price only), buy = IN STOCK */
+  /** sell = IN DEMAND (price and observed accepted sizes), buy = IN STOCK */
   side: Side
   terminalId: string | null
   terminalSource: 'screen' | 'last' | null

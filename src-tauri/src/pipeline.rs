@@ -372,16 +372,49 @@ fn read_row(ocr: &dyn OcrEngine, gray: &image::GrayImage, row: &LocatedRow, cata
     };
 
     let quantity = number(row.quantity, &row.quantity_text, &parse::parse_quantity);
-    let sizes = match (row.side, row.sizes) {
-        (Side::Sell, _) => Field::empty(),
-        (Side::Buy, None) => Field { value: Some(vec![]), text: String::new(), confidence: row.confidence * 0.5, crop: None, rect: None },
-        (Side::Buy, Some(rect)) => {
-            let (text, conf) = read_field(ocr, gray, rect, Charset::Sizes);
+    let read_sizes = |rect, button_band| {
+        if button_band {
+            let crop = vision::resize_to_height(&vision::crop_gray(gray, rect), 96);
+            let mask = vision::to_dark_text(&crop, vision::otsu(&crop, 90));
+            let clean = vision::white_border(&vision::remove_edge_ink(&mask), 32);
+            match ocr.read_line(&clean, Charset::Sizes) {
+                Ok(r) => (r.text, r.confidence),
+                Err(e) => { log::warn!("size OCR failed: {e}"); (String::new(), 0.0) }
+            }
+        } else {
+            read_field(ocr, gray, rect, Charset::Sizes)
+        }
+    };
+    let mut sizes = match row.sizes {
+        None => Field { value: Some(row.sizes_found.clone()), text: String::new(), confidence: row.confidence * 0.5, crop: None, rect: None },
+        Some(rect) => {
+            let (text, conf) = read_sizes(rect, row.sizes_are_button_band);
             let parsed = parse::parse_sizes(&text);
-            let (value, conf) = if parsed.is_empty() { (row.sizes_found.clone(), row.confidence * 0.5) } else { (parsed, conf) };
+            let (mut value, mut conf) = if parsed.is_empty() { (row.sizes_found.clone(), row.confidence * 0.5) } else { (parsed, conf) };
+            if row.side == Side::Sell && row.sizes_found.iter().any(|s| !value.contains(s)) {
+                value.extend(&row.sizes_found);
+                value.sort_unstable();
+                value.dedup();
+                conf = conf.min(row.confidence * 0.5);
+            }
             Field { value: Some(value), text, confidence: conf, crop: None, rect: Some(rect) }
         }
     };
+
+    for rect in &row.additional_size_bands {
+        let (text, conf) = read_sizes(*rect, true);
+        let extra = parse::parse_sizes(&text);
+        if !extra.is_empty() {
+            let values = sizes.value.get_or_insert_with(Vec::new);
+            values.extend(extra);
+            values.sort_unstable();
+            values.dedup();
+            sizes.confidence = sizes.confidence.min(conf);
+            sizes.text.push_str(&format!("; {text}"));
+            // Keep one card-local review crop; never join bands across cards.
+            sizes.rect.get_or_insert(*rect);
+        }
+    }
 
     Reading {
         id: uuid::Uuid::new_v4().to_string(),
@@ -401,5 +434,66 @@ fn read_row(ocr: &dyn OcrEngine, gray: &image::GrayImage, row: &LocatedRow, cata
         frame: None,
         frame_width: 0,
         frame_height: 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ocr::{OcrError, OcrText, OcrWord};
+
+    struct FirstVariantOcr;
+
+    #[test]
+    #[ignore = "requires the local Orison screenshot in samples and prepared OCR"]
+    fn real_sell_sample() {
+        let resources = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("resources");
+        let ocr = crate::ocr::Tesseract::find(None, Some(&resources)).unwrap();
+        let frame = image::open(resources.join("../../samples/1920x1080_orison_demand-and-stock.png")).unwrap().to_rgba8();
+        let gray = vision::brightness(&frame);
+        let catalog = crate::model::Catalog {
+            commodities: ["Savrilium", "Tungsten", "Organics"].into_iter().map(|name| crate::model::Commodity {
+                id: name.to_lowercase(), name: name.into(), game_name: Some(name.into()), display_name: None,
+            }).collect(),
+            ..Default::default()
+        };
+        let located = locate_frame(&ocr, &gray, &catalog).unwrap().unwrap();
+        assert_eq!(located.rows[0].additional_size_bands.len(), 1, "keep unreadable quality-variant bands for close OCR");
+        let readings: Vec<_> = located.rows.iter().map(|r| read_row(&ocr, &gray, r, &catalog)).collect();
+        let sell: Vec<_> = readings.iter().filter(|r| r.side == Side::Sell).collect();
+        assert_eq!(sell.len(), 2);
+        assert_eq!(sell[0].sizes.value, Some(vec![1, 4]));
+        assert_eq!(sell[1].sizes.value, Some(vec![1, 2]));
+        assert!(sell.iter().all(|r| r.quantity.value.is_none()));
+        assert!(readings.iter().filter(|r| r.side == Side::Buy).all(|r| r.sizes.value == Some(vec![])));
+    }
+
+    impl OcrEngine for FirstVariantOcr {
+        fn name(&self) -> String { "fixture".into() }
+        fn read_line(&self, _: &image::GrayImage, charset: Charset) -> Result<OcrText, OcrError> {
+            let text = match charset {
+                Charset::Name => "SAVRILIUM",
+                Charset::Number => "135876",
+                Charset::Sizes => "1x1 4x2",
+            };
+            Ok(OcrText { text: text.into(), confidence: 1.0 })
+        }
+        fn read_words(&self, _: &image::GrayImage) -> Result<Vec<OcrWord>, OcrError> { unreachable!() }
+    }
+
+    #[test]
+    fn sell_size_close_read_retains_other_quality_variants() {
+        let rect = NormRect { x: 0.0, y: 0.0, w: 1.0, h: 0.2 };
+        let other_card = NormRect { y: 0.7, ..rect };
+        let row = LocatedRow {
+            side: Side::Sell, row: rect, name: rect, name_text: "SAVRILIUM".into(), commodity: None,
+            price: Some(rect), price_text: Some("135876".into()), quantity: None, quantity_text: None,
+            sizes: Some(rect), sizes_are_button_band: false, additional_size_bands: vec![other_card], sizes_found: vec![1, 4, 16], confidence: 1.0,
+        };
+        let reading = read_row(&FirstVariantOcr, &image::GrayImage::new(100, 100), &row, &crate::model::Catalog::default());
+        assert_eq!(reading.sizes.value, Some(vec![1, 4, 16]));
+        assert!(reading.quantity.value.is_none());
+        assert_eq!(reading.sizes.rect, Some(rect), "review crop must not span quality-variant cards");
+        assert!(reading.sizes.confidence <= 0.5, "sizes without a close-read vote need review");
     }
 }

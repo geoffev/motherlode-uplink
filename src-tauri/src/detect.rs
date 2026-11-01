@@ -15,8 +15,9 @@
 //     [1 x1] [4 x2]  MAX                 AVAILABLE CARGO SIZE (SCU)
 //   …                                    OUT OF STOCK  +
 //
-// IN DEMAND rows are the sell side; only their price is the terminal's (the SCU
-// and boxes are the player's own cargo). IN STOCK rows are the buy side: price,
+// IN DEMAND rows give sell prices and positive evidence of accepted cargo sizes
+// from the player's inventory. Their SCU quantity is not terminal demand.
+// IN STOCK rows are the buy side: price,
 // shop quantity, cargo sizes. YOUR INVENTORIES names the location.
 // The middle of the screen is the game world, so each list is bounded by its
 // own labels and its right-aligned prices.
@@ -53,6 +54,8 @@ fn is_inventory_word(text: &str) -> bool {
 
 /// Cargo-size boxes come back with their borders: "|16", "[24", "32'", "1,2", "4/8", "|B".
 fn box_sizes(text: &str) -> Vec<u32> {
+    // Counts below/inside a button (x2) are not additional container sizes.
+    let text = text.split(['x', 'X', '×']).next().unwrap_or("");
     let cleaned: String = text
         .chars()
         .filter(|c| !"|[](){}'\"`".contains(*c))
@@ -170,6 +173,8 @@ pub struct LocatedRow {
     pub quantity: Option<NormRect>,
     pub quantity_text: Option<String>,
     pub sizes: Option<NormRect>,
+    pub sizes_are_button_band: bool,
+    pub additional_size_bands: Vec<NormRect>,
     pub sizes_found: Vec<u32>,
     pub confidence: f32,
 }
@@ -514,6 +519,19 @@ fn name_continuation<'a>(line: &[&'a OcrWord], name_x0: f32, lh: f32) -> Vec<&'a
     out
 }
 
+fn is_cargo_label(line: &[&OcrWord]) -> bool {
+    let near = |w: &OcrWord, label: &str| strsim::levenshtein(&normalise(&w.text), label) <= label.len() / 4;
+    line.iter().any(|w| near(w, "CARGO") || near(w, "AVAILABLE")) && line.iter().any(|w| near(w, "SIZE"))
+}
+
+fn clip_rect(rect: NormRect, bounds: NormRect) -> Option<NormRect> {
+    let x = rect.x.max(bounds.x);
+    let y = rect.y.max(bounds.y);
+    let right = (rect.x + rect.w).min(bounds.x + bounds.w);
+    let bottom = (rect.y + rect.h).min(bounds.y + bounds.h);
+    (right > x && bottom > y).then_some(NormRect { x, y, w: right - x, h: bottom - y })
+}
+
 /// Lines of one list → commodity rows. A row starts at a line with a commodity
 /// name and takes the lines below it until the next name.
 fn read_rows(ctx: &Ctx, region: &Region, lines: &[Vec<&OcrWord>], catalog: &Catalog) -> Vec<LocatedRow> {
@@ -529,6 +547,15 @@ fn read_rows(ctx: &Ctx, region: &Region, lines: &[Vec<&OcrWord>], catalog: &Cata
     let mut rows: Vec<Row> = Vec::new();
     for line in lines {
         let cy = line.iter().map(|w| w.cy()).sum::<f32>() / line.len() as f32;
+        // A damaged label (e.g. CARGO → CARED) must not start a new commodity.
+        if is_cargo_label(line) {
+            if let Some(cur) = rows.last_mut() {
+                cur.lines.push(line.clone());
+                cur.last_y = cy;
+                cur.naming = false;
+            }
+            continue;
+        }
         // A long name wraps ("SHIP / AMMUNITION - / SIZE 2"): a line right under
         // the name, starting in line with it, carries on the name.
         // Measured in the name's own font, which is bigger than the labels.
@@ -566,6 +593,11 @@ fn read_rows(ctx: &Ctx, region: &Region, lines: &[Vec<&OcrWord>], catalog: &Cata
         r.commodity = match_commodity(&text, catalog);
     }
 
+    // OCR blobs from button borders can look like names. Only actual commodity
+    // matches or rows with a per-SCU price establish the next card boundary.
+    let card_tops: Vec<f32> = rows.iter().filter(|r| {
+        r.commodity.is_some() || r.lines.iter().flatten().any(|w| per_scu_number(&w.text).is_some())
+    }).map(|r| r.name.iter().map(|w| w.y0).fold(f32::INFINITY, f32::min)).collect();
     let mut out = Vec::new();
     for r in rows {
         let all: Vec<&OcrWord> = r.lines.iter().flatten().copied().collect();
@@ -579,6 +611,12 @@ fn read_rows(ctx: &Ctx, region: &Region, lines: &[Vec<&OcrWord>], catalog: &Cata
             })
             .or_else(|| all.iter().find_map(|w| per_scu_number(&w.text).map(|t| (*w, t.to_string()))));
         let Some(price) = price else { continue };
+        let card_top = r.name.iter().map(|w| w.y0).fold(f32::INFINITY, f32::min);
+        let card_bottom = card_tops.iter().copied().filter(|y| *y > card_top).fold(region.y1, f32::min);
+        let card = NormRect {
+            x: region.x0 / ctx.w, y: card_top / ctx.h,
+            w: (region.x1 - region.x0) / ctx.w, h: (card_bottom - card_top) / ctx.h,
+        };
 
         let mut row = LocatedRow {
             side: region.side,
@@ -591,6 +629,8 @@ fn read_rows(ctx: &Ctx, region: &Region, lines: &[Vec<&OcrWord>], catalog: &Cata
             quantity: None,
             quantity_text: None,
             sizes: None,
+            sizes_are_button_band: false,
+            additional_size_bands: vec![],
             sizes_found: vec![],
             confidence: all.iter().map(|w| w.confidence).fold(1.0, f32::min),
         };
@@ -609,17 +649,31 @@ fn read_rows(ctx: &Ctx, region: &Region, lines: &[Vec<&OcrWord>], catalog: &Cata
                     break;
                 }
             }
-            let near = |w: &OcrWord, label: &str| strsim::levenshtein(&normalise(&w.text), label) <= label.len() / 4;
-            if let Some(start) = r.lines.iter().position(|l| {
-                l.iter().any(|w| near(w, "CARGO") || near(w, "AVAILABLE")) && l.iter().any(|w| near(w, "SIZE"))
-            }) {
-                let boxes: Vec<&OcrWord> =
-                    r.lines[start + 1..].iter().flatten().copied().filter(|w| !box_sizes(&w.text).is_empty()).collect();
-                row.sizes_found = boxes.iter().flat_map(|w| box_sizes(&w.text)).collect();
-                row.sizes_found.sort_unstable();
-                row.sizes_found.dedup();
-                row.sizes = ctx.rect_of(&boxes).map(|r| ctx.pad(r));
+        }
+        if let Some(start) = r.lines.iter().position(|l| is_cargo_label(l)) {
+            // Only the size-button line immediately below the label. An
+            // expanded sell row continues with counts, time and totals.
+            let boxes: Vec<&OcrWord> = r.lines.get(start + 1).into_iter().flatten().copied()
+                .filter(|w| w.y0 >= card_top && w.y1 <= card_bottom && !box_sizes(&w.text).is_empty()).collect();
+            row.sizes_found = boxes.iter().flat_map(|w| box_sizes(&w.text)).collect();
+            row.sizes_found.sort_unstable();
+            row.sizes_found.dedup();
+            row.sizes = ctx.rect_of(&boxes).map(|r| ctx.pad(r));
+            if row.sizes.is_none() {
+                // Button borders can make sparse OCR return one unreadable blob.
+                // Locate its number band from the label so the close pass still runs.
+                let label = ctx.rect_of(&r.lines[start]).unwrap();
+                row.sizes = Some(NormRect {
+                    x: label.x,
+                    y: label.y + label.h + lh * 0.3 / ctx.h,
+                    w: (region.x1 / ctx.w - label.x).max(0.0),
+                    h: lh * 2.5 / ctx.h,
+                });
+                row.sizes_are_button_band = true;
             }
+            // Clamp both padded glyph crops and inferred bands before merging
+            // quality variants. Each OCR call must stay in its original card.
+            row.sizes = row.sizes.and_then(|rect| clip_rect(rect, card));
         }
         out.push((row, r.lines.iter().flatten().any(|w| is_inventory_word(&w.text))));
     }
@@ -647,6 +701,22 @@ fn merge_variants(rows: Vec<LocatedRow>) -> Vec<LocatedRow> {
                 let price = |x: &LocatedRow| x.price_text.as_deref().and_then(parse::parse_price).map(|p| p.0);
                 if price(o) != price(&r) {
                     o.confidence = o.confidence.min(0.3);
+                }
+                // Each quality variant can expose different inventory sizes.
+                // Keep the first crop for review, and retain all positive sizes.
+                if r.side == Side::Sell {
+                    // Changes on another quality row must invalidate crop dedupe.
+                    o.row = o.row.union(r.row);
+                    o.confidence = o.confidence.min(r.confidence);
+                    o.sizes_found.extend(r.sizes_found);
+                    o.sizes_found.sort_unstable();
+                    o.sizes_found.dedup();
+                    if o.sizes.is_none() {
+                        o.sizes = r.sizes;
+                        o.sizes_are_button_band = r.sizes_are_button_band;
+                    } else if r.sizes_are_button_band {
+                        o.additional_size_bands.extend(r.sizes);
+                    }
                 }
             }
             None => out.push(r),
@@ -755,7 +825,10 @@ mod tests {
         );
 
         let sav = &loc.rows[0];
-        assert!(sav.quantity.is_none() && sav.sizes.is_none(), "sell rows carry the player's cargo, not the terminal's");
+        assert!(sav.quantity.is_none(), "player cargo quantity is not terminal demand");
+        assert_eq!(sav.sizes_found, vec![1, 4]);
+        assert!(sav.sizes.is_some());
+        assert_eq!(loc.rows[1].sizes_found, vec![1, 2]);
         assert!(sav.confidence > 0.5, "quality variants at one price merge cleanly");
 
         let org = &loc.rows[2];
@@ -766,9 +839,62 @@ mod tests {
     #[test]
     fn buy_side_cargo_boxes() {
         let mut words = orison_words();
-        words.extend([w("1", 1560.0, 432.0), w("8", 1600.0, 432.0), w("X1", 1556.0, 450.0), w("X3", 1596.0, 450.0)]);
+        words.extend([w("1", 1560.0, 432.0), w("8", 1600.0, 432.0), w("X1", 1556.0, 450.0), w("X2", 1596.0, 450.0)]);
         let loc = locate(&words, &GrayImage::new(2560, 1440), &catalog()).unwrap();
         assert_eq!(loc.rows[2].sizes_found, vec![1, 8]);
+    }
+
+    #[test]
+    fn sell_sizes_merge_quality_variants_without_counts_or_expanded_controls() {
+        let mut words = orison_words();
+        for word in &mut words {
+            // The second quality exposes a size not present on the first row.
+            if word.text == "1" && (word.y0 - 754.0 * 4.0 / 3.0).abs() < 1.0 { word.text = "16".into(); }
+            // A selected container below the button strip is not acceptance evidence.
+            if word.text == "4" && (word.y0 - 558.0 * 4.0 / 3.0).abs() < 1.0 { word.text = "32".into(); }
+        }
+        let loc = locate(&words, &GrayImage::new(2560, 1440), &catalog()).unwrap();
+        assert_eq!(loc.rows[0].sizes_found, vec![1, 4, 16]);
+        assert!(loc.rows[0].quantity.is_none());
+    }
+
+    #[test]
+    fn cargo_label_survives_misread_word_and_unreadable_buttons() {
+        let mut words = orison_words();
+        for word in &mut words {
+            if word.text == "CARGO" { word.text = "CARED".into(); }
+        }
+        // Match the sparse OCR failure on the real screenshot: the first strip
+        // is one tall blob rather than separate size digits.
+        words.retain(|word| !(word.y0 >= 458.0 * 4.0 / 3.0 && word.y0 < 500.0 * 4.0 / 3.0 && word.x0 > 450.0 * 4.0 / 3.0 && word.x0 < 650.0 * 4.0 / 3.0));
+        words.push(OcrWord { text: "Li".into(), x0: 633.0, y0: 610.0, x1: 857.0, y1: 664.0, confidence: 0.2 });
+        let loc = locate(&words, &GrayImage::new(2560, 1440), &catalog()).unwrap();
+        let sav = &loc.rows[0];
+        assert!(sav.sizes_are_button_band);
+        let band = sav.sizes.expect("missing glyphs still need a close-read band");
+        assert!(band.y + band.h < 519.0 / 1080.0, "exclude expanded controls");
+        assert_eq!(loc.rows[1].sizes_found, vec![1, 2]);
+    }
+
+    #[test]
+    fn inferred_size_band_stops_before_next_commodity_card() {
+        let mut words = orison_words();
+        words.retain(|w| !(w.y0 >= 441.0 * 4.0 / 3.0 && w.y0 < 500.0 * 4.0 / 3.0 && w.x0 > 450.0 * 4.0 / 3.0 && w.x0 < 650.0 * 4.0 / 3.0));
+        // A close-to-bottom label would otherwise project into the next card.
+        words.extend([w("AVAILABLE", 458.0, 650.0), w("CARGO", 517.0, 650.0), w("SIZE", 566.0, 650.0)]);
+        let loc = locate(&words, &GrayImage::new(2560, 1440), &catalog()).unwrap();
+        let band = loc.rows[0].sizes.unwrap();
+        assert!(loc.rows[0].sizes_are_button_band);
+        assert!(band.y + band.h <= 679.0 / 1080.0 + 1e-6);
+        assert!(band.h < 0.02, "clip the inferred height at the next card");
+    }
+
+    #[test]
+    fn crop_clipping_rejects_other_cards_and_limits_all_edges() {
+        let card = NormRect { x: 0.25, y: 0.25, w: 0.25, h: 0.25 };
+        let oversized = NormRect { x: 0.1, y: 0.2, w: 0.7, h: 0.7 };
+        assert_eq!(clip_rect(oversized, card), Some(card));
+        assert!(clip_rect(NormRect { y: 0.6, ..card }, card).is_none());
     }
 
     #[test]

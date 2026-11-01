@@ -160,9 +160,8 @@ pub fn confirm_readings(app: AppHandle, st: State<AppState>, items: Vec<Confirma
         // When this row's values were last on screen: its line's observedAt.
         c.observed_at = st.readings.guard().get(&c.reading_id).map(|r| r.updated_at);
         if c.side == Side::Sell {
-            // Only the price on a sell row is the terminal's.
+            // Inventory sizes show accepted containers; its quantity is not demand.
             c.quantity = None;
-            c.sizes.clear();
         }
         if c.price.is_none() && c.quantity.is_none() && c.sizes.is_empty() {
             return Err(format!("{}: enter a price", commodity.label()));

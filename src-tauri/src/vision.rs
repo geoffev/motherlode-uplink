@@ -98,6 +98,27 @@ pub fn prepare_line(img: &GrayImage, target_h: u32) -> GrayImage {
     white_border(&to_dark_text(&scaled, t), target_h / 3)
 }
 
+/// Remove button outlines and clipped lower-line counts from a number band.
+/// Those shapes touch the crop boundary; the size glyphs sit inside it.
+pub fn remove_edge_ink(img: &GrayImage) -> GrayImage {
+    let mut out = img.clone();
+    let (w, h) = out.dimensions();
+    if w == 0 || h == 0 { return out; }
+    let mut stack = Vec::new();
+    for x in 0..w { stack.extend([(x, 0), (x, h - 1)]); }
+    for y in 0..h { stack.extend([(0, y), (w - 1, y)]); }
+    while let Some((x, y)) = stack.pop() {
+        if out.get_pixel(x, y)[0] >= 128 { continue; }
+        out.put_pixel(x, y, Luma([255]));
+        for ny in y.saturating_sub(1)..=(y + 1).min(h - 1) {
+            for nx in x.saturating_sub(1)..=(x + 1).min(w - 1) {
+                if out.get_pixel(nx, ny)[0] < 128 { stack.push((nx, ny)); }
+            }
+        }
+    }
+    out
+}
+
 pub fn to_pixels(r: NormRect, w: u32, h: u32) -> (u32, u32, u32, u32) {
     let x = ((r.x * w as f32).round() as u32).min(w.saturating_sub(1));
     let y = ((r.y * h as f32).round() as u32).min(h.saturating_sub(1));
@@ -157,6 +178,19 @@ pub fn hamming(a: &Hash, b: &Hash) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn size_band_removes_border_and_clipped_count_but_keeps_digit() {
+        let mut img = GrayImage::from_pixel(30, 20, Luma([255]));
+        for y in 0..20 { img.put_pixel(2, y, Luma([0])); img.put_pixel(27, y, Luma([0])); }
+        for x in 2..28 { img.put_pixel(x, 0, Luma([0])); }
+        for y in 5..12 { img.put_pixel(12, y, Luma([0])); }
+        for y in 17..20 { img.put_pixel(15, y, Luma([0])); }
+        let clean = remove_edge_ink(&img);
+        assert_eq!(clean.get_pixel(2, 8)[0], 255);
+        assert_eq!(clean.get_pixel(15, 18)[0], 255);
+        assert_eq!(clean.get_pixel(12, 8)[0], 0);
+    }
 
     #[test]
     fn dhash_is_stable_across_scale() {
