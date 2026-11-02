@@ -272,10 +272,29 @@ pub fn set_capture_enabled(app: AppHandle, enabled: bool) -> Res<Settings> {
 }
 
 #[tauri::command]
-pub async fn scan_image(app: AppHandle, path: String) -> Res<ScanOutcome> {
+pub async fn scan_image(app: AppHandle) -> Res<Option<ScanOutcome>> {
     tauri::async_runtime::spawn_blocking(move || {
-        let img = image::open(&path).map_err(|e| format!("Could not open the image: {e}"))?.to_rgba8();
-        pipeline::process_frame(&app, &img)
+        use tauri_plugin_dialog::DialogExt;
+        let Some(file) = app.dialog().file()
+            .add_filter("Screenshots", &["png", "jpg", "jpeg", "bmp", "webp"])
+            .blocking_pick_file() else { return Ok(None) };
+        let path = file.into_path().map_err(|e| e.to_string())?;
+        let img = crate::vision::open_screenshot(&path)?;
+        pipeline::process_frame(&app, &img).map(Some)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn select_crops_folder(app: AppHandle) -> Res<Option<String>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri_plugin_dialog::DialogExt;
+        let Some(folder) = app.dialog().file().blocking_pick_folder() else { return Ok(None) };
+        // Keep cleanup inside a dedicated app-owned child, away from unrelated dated folders.
+        let path = folder.into_path().map_err(|e| e.to_string())?.join("Motherlode Uplink crops");
+        *app.state::<AppState>().selected_crops_dir.guard() = Some(path.clone());
+        Ok(Some(path.to_string_lossy().into_owned()))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -317,19 +336,16 @@ pub fn save_settings(app: AppHandle, settings: Settings) -> Res<Settings> {
     let st = app.state::<AppState>();
     let next = settings.sanitised();
     let prev = st.settings.guard().clone();
+    if next.crops_dir != prev.crops_dir && next.crops_dir.is_some()
+        && next.crops_dir != *st.selected_crops_dir.guard() {
+        return Err("Choose the crops folder using the folder picker".into());
+    }
+
 
     if next.start_with_computer != prev.start_with_computer {
         let al = app.autolaunch();
         let r = if next.start_with_computer { al.enable() } else { al.disable() };
         r.map_err(|e| format!("Could not change start-with-computer: {e}"))?;
-    }
-    if next.tesseract_path != prev.tesseract_path {
-        // A file the player browsed to gets run, so make sure it's Tesseract first.
-        if let Some(p) = &next.tesseract_path {
-            crate::ocr::Tesseract::verify(p)?;
-        }
-        let resources = app.path().resource_dir().map_err(|e| e.to_string())?;
-        *st.ocr.guard() = crate::ocr::create(next.tesseract_path.as_deref(), Some(&resources));
     }
     if next.api_base != prev.api_base {
         // Another server: its catalog and the key's owner may differ.
@@ -342,7 +358,6 @@ pub fn save_settings(app: AppHandle, settings: Settings) -> Res<Settings> {
     }
     next.save(&st.paths.settings).map_err(|e| e.to_string())?;
     *st.settings.guard() = next.clone();
-    let _ = app.asset_protocol_scope().allow_directory(st.crops().root, true);
     st.wake_capture();
     crate::tray::sync(&app);
     Ok(next)

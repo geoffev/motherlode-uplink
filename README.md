@@ -47,17 +47,20 @@ Development builds talk to `http://localhost:3000` by default; change the
 server under **Settings**. Release builds always use `https://cryon.rocks`.
 
 Windows installer builds run `prepare:ocr` automatically. Run it before development
-or Rust tests on a fresh checkout. It builds Tesseract 5.5.3 with Leptonica 1.87.0,
-libpng 1.6.59 and zlib 1.3.2 from SHA-256-pinned sources, using static linking.
-Only PNG support is enabled; no UB Mannheim/MSYS2 runtime DLLs are bundled.
-The English tessdata_fast 4.1.0 model is also pinned. The script verifies the
-executable's Windows imports, copies the exact source licenses, and checks English
-TSV recognition with system OCR paths removed. The first build takes a few minutes;
-later runs reuse the native build. CI does this automatically. Downloads, native
-builds and generated license/resource files are ignored by Git. To select CMake,
-run `powershell -File scripts/prepare-ocr.ps1 -CMakePath C:\path\to\cmake.exe`.
-Settings can override the executable; clear the override to use bundled OCR.
-Non-Windows development requires a system Tesseract installation.
+or Rust tests on a fresh checkout. It builds Tesseract 5.5.4 and Leptonica 1.87.0 from SHA-256-pinned sources,
+using static linking. Native image codecs and the legacy OCR engine are disabled;
+libpng, zlib and UB Mannheim/MSYS2 runtime DLLs are not needed by the OCR build.
+The English tessdata_fast 4.1.0 model is also pinned. The script stages the model,
+records native library hashes, and copies the exact source licenses. Rust tests
+verify native English recognition. The first build takes a few minutes; later
+runs reuse the native build. CI does this automatically. Downloads, native builds
+and generated license/resource files are ignored by Git. To select CMake, run
+`powershell -File scripts/prepare-ocr.ps1 -CMakePath C:\path\to\cmake.exe`.
+OCR calls the statically linked Tesseract API with image and model bytes in memory.
+No OCR executable is shipped or launched; legacy executable overrides are ignored.
+The model hash is checked in Rust before native code parses it.
+Non-Windows development requires a native Tesseract library and the English model
+at the app resource path `tesseract/tessdata/eng.traineddata`.
 
 See [OCR redistribution review](scripts/OCR-COMPLIANCE.md) for versions, licenses
 and release verification requirements.
@@ -101,7 +104,7 @@ src-tauri/src/
   pipeline.rs  capture loop: thumbnail hash → steady? → full-frame read → queue
   detect.rs    finds the terminal from OCR'd words (IN DEMAND / IN STOCK lists, location)
   parse.rs     OCR text → prices, SCU, container sizes
-  ocr.rs       OcrEngine trait; Tesseract run as a child process
+  ocr.rs       OcrEngine trait; statically linked Tesseract C API
   vision.rs    brightness, thresholds, perceptual hashes, crops
   dedupe.rs    duplicate rows (crop hash) and duplicate values (same key + values)
   store.rs     review queue; crops on disk with retention, plus confirmed labels

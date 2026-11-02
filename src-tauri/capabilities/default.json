@@ -2,10 +2,30 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
-    "core:default",
-    "dialog:allow-open",
-    "opener:default"
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "opener:default",
+    "allow-get-session",
+    "allow-sign-in",
+    "allow-sign-out",
+    "allow-refresh-session",
+    "allow-get-catalog",
+    "allow-refresh-catalog",
+    "allow-list-readings",
+    "allow-confirm-readings",
+    "allow-reject-reading",
+    "allow-list-outbox",
+    "allow-retry-report",
+    "allow-get-capture-status",
+    "allow-set-capture-enabled",
+    "allow-scan-image",
+    "allow-select-crops-folder",
+    "allow-get-app-info",
+    "allow-get-settings",
+    "allow-save-settings"
   ]
 }

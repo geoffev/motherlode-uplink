@@ -48,6 +48,8 @@ pub struct CaptureStatus {
 pub struct AppState {
     pub paths: Paths,
     pub settings: Mutex<Settings>,
+    /// A custom storage root must first be chosen through the native folder picker.
+    pub selected_crops_dir: Mutex<Option<PathBuf>>,
     pub api_key: Mutex<Option<String>>,
     pub me: Mutex<Option<Me>>,
     pub catalog: Mutex<Arc<Catalog>>,

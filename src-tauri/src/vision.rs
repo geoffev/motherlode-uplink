@@ -6,6 +6,28 @@ use image::{GrayImage, Luma, RgbaImage};
 
 use crate::model::NormRect;
 
+/// Bound imported image dimensions and allocations before decoding untrusted files.
+pub fn open_screenshot(path: &std::path::Path) -> Result<RgbaImage, String> {
+    let mut reader = image::ImageReader::open(path)
+        .and_then(|r| r.with_guessed_format())
+        .map_err(|e| format!("Could not open the image: {e}"))?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(8192);
+    limits.max_image_height = Some(8192);
+    limits.max_alloc = Some(256 * 1024 * 1024);
+    reader.limits(limits.clone());
+    let mut decoder = reader.into_decoder().map_err(|e| format!("Could not decode the image: {e}"))?;
+    use image::ImageDecoder;
+    let (width, height) = decoder.dimensions();
+    if width == 0 || height == 0 || width > 8192 || height > 8192 || u64::from(width) * u64::from(height) > 32_000_000 {
+        return Err("Screenshot is too large (maximum 8192 per side and 32 million pixels)".into());
+    }
+    decoder.set_limits(limits).map_err(|e| format!("Image exceeds decoding limits: {e}"))?;
+    image::DynamicImage::from_decoder(decoder)
+        .map(|image| image.to_rgba8())
+        .map_err(|e| format!("Could not decode the image: {e}"))
+}
+
 /// Brightest channel per pixel. Terminal text is bright over a dark panel, and
 /// coloured text (gold, teal) stays bright where plain luma would dim it.
 pub fn brightness(img: &RgbaImage) -> GrayImage {
@@ -177,6 +199,17 @@ pub fn hamming(a: &Hash, b: &Hash) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn imported_images_have_dimension_limits() {
+        let dir = tempfile::tempdir().unwrap();
+        let normal = dir.path().join("normal.png");
+        image::RgbaImage::new(100, 50).save(&normal).unwrap();
+        assert_eq!(super::open_screenshot(&normal).unwrap().dimensions(), (100, 50));
+        let oversized = dir.path().join("oversized.png");
+        image::RgbaImage::new(8193, 1).save(&oversized).unwrap();
+        assert!(super::open_screenshot(&oversized).is_err());
+    }
+
     use super::*;
 
     #[test]

@@ -1,29 +1,24 @@
 Motherlode Uplink includes a custom-built Tesseract OCR runtime and English
 language data. These components are credited to their upstream authors.
 
-Tesseract 5.5.3 and tessdata_fast 4.1.0: Apache License 2.0.
+Tesseract 5.5.4 and tessdata_fast 4.1.0: Apache License 2.0.
   Copyright holders include Hewlett-Packard, Google and upstream contributors.
   See doc/LICENSE-tesseract.txt (also applies to the English model) and
   doc/Tesseract-AUTHORS.txt.
-  https://github.com/tesseract-ocr/tesseract/tree/5.5.3
+  https://github.com/tesseract-ocr/tesseract/tree/5.5.4
   https://github.com/tesseract-ocr/tessdata_fast/tree/4.1.0
 
 Leptonica 1.87.0: BSD-2-Clause. See doc/LICENSE-leptonica.txt.
   https://github.com/DanBloomberg/leptonica/tree/1.87.0
 
-libpng 1.6.59: PNG Reference Library License version 2.
-  See doc/LICENSE-libpng.txt.
-  https://github.com/pnggroup/libpng/tree/v1.6.59
-
-zlib 1.3.2: zlib License. See doc/LICENSE-zlib.txt.
-  https://github.com/madler/zlib/tree/v1.3.2
-
 The runtime is built from the pinned sources described in SOURCE-MANIFEST.json,
 using the recipe in scripts/build-ocr.ps1 in the Motherlode Uplink repository.
-No upstream source files are modified. Optional image codecs, network/archive
-support, training tools, OpenMP and the graphics viewer are disabled. The app
-uses PNG input. The four libraries and the Microsoft C/C++ runtime are linked
-statically; the resulting executable imports only Windows' KERNEL32.dll.
+No upstream source files are modified. Optional image codecs, the legacy OCR
+engine, network/archive support, training tools, OpenMP and the graphics viewer
+are disabled. The app
+passes grayscale pixels and model bytes directly to the native API. Both
+OCR libraries are linked statically into the app; no OCR executable or DLL is
+bundled. The OCR Microsoft C/C++ runtime is linked statically.
 
 No UB Mannheim/MSYS2 binaries or GPL/LGPL libraries are included in this OCR
 bundle. Microsoft runtime libraries are used under the Visual Studio Build Tools

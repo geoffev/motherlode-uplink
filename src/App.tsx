@@ -36,7 +36,7 @@ export default function App() {
 
   useEffect(() => {
     ipc.getAppInfo().then(i => setOcrMissing(!!i.ocrError))
-  }, [settings?.tesseractPath])
+  }, [])
 
   if (!session) return <div className="boot" />
 
@@ -121,7 +121,7 @@ export default function App() {
       {status?.state === 'error' && status.message && (
         <div className="banner banner--error" role="status">{status.message}</div>
       )}
-      {ocrMissing && settings && <OcrSetupBanner settings={settings} onSaved={data.setSettings} />}
+      {ocrMissing && settings && <OcrSetupBanner />}
       {!data.catalog.commodities.length && (
         <div className="banner" role="status">
           Game data hasn't loaded yet, so commodities and terminals can't be matched.

@@ -60,6 +60,8 @@ impl Client {
         let http = reqwest::Client::builder()
             .user_agent(concat!("MotherlodePriceReporter/", env!("CARGO_PKG_VERSION")))
             .timeout(Duration::from_secs(20))
+            // Authenticated API requests must not be redirected to another endpoint.
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .expect("HTTP client");
         Client { http, base: base.trim_end_matches('/').to_string(), key: key.to_string() }

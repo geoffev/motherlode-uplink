@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
-import { open } from '@tauri-apps/plugin-dialog'
 import { errorText, ipc } from '../lib/ipc'
 import type { AppInfo, Catalog, Session, Settings } from '../lib/types'
 import { Checkbox } from './Fields'
-import { pickTesseract } from './OcrSetup'
 
 const URL_PRESETS = [
   { label: 'Production', url: 'https://cryon.rocks' },
@@ -126,23 +124,7 @@ export function SettingsView({ settings, session, catalog, onSaved, onSignOut, o
             <Checkbox checked={draft.startWithComputer} onChange={v => set('startWithComputer', v)}>Start with my computer (in the tray)</Checkbox>
           </div>
           <div className="setting">
-            <label className="t-label" htmlFor="s-tess">Tesseract path override</label>
-            <div className="setting-inline">
-              <input
-                id="s-tess"
-                className="input"
-                placeholder="Automatic (bundled OCR on Windows)"
-                value={draft.tesseractPath ?? ''}
-                onChange={e => set('tesseractPath', e.target.value || null)}
-              />
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={async () => { const p = await pickTesseract(); if (p) set('tesseractPath', p) }}
-              >
-                Browse
-              </button>
-            </div>
+            <span className="t-label">OCR engine</span>
             {info && (
               <span className={`t-caption${info.ocrError ? ' is-error' : ''}`}>
                 {info.ocrError ?? `Using ${info.ocrEngine}`}
@@ -162,7 +144,7 @@ export function SettingsView({ settings, session, catalog, onSaved, onSignOut, o
               <button
                 type="button"
                 className="btn btn--ghost btn--sm"
-                onClick={async () => { const p = await open({ directory: true }); if (typeof p === 'string') set('cropsDir', p) }}
+                onClick={async () => { try { const p = await ipc.selectCropsFolder(); if (p) set('cropsDir', p) } catch (e) { setMsg({ ok: false, text: errorText(e) }) } }}
               >
                 Change
               </button>

@@ -37,7 +37,7 @@ function Invoke-CMake([string[]]$Arguments) {
 
 $packages = Get-Content -LiteralPath "$PSScriptRoot/ocr-sources.json" -Raw | ConvertFrom-Json
 foreach ($package in $packages) {
-    $archive = Join-Path $sources "$($package.name).tar.gz"
+    $archive = Join-Path $sources "$($package.name)-$($package.version).tar.gz"
     if (!(Test-Path -LiteralPath $archive)) {
         Invoke-WebRequest -UseBasicParsing -Uri $package.url -OutFile $archive
     }
@@ -53,9 +53,17 @@ foreach ($package in $packages) {
 # Rebuild when the recipe, source pins or selected compiler installation changes.
 $key = ((Get-OcrSha256 $PSCommandPath) + (Get-OcrSha256 "$PSScriptRoot/ocr-sources.json") + (Get-OcrSha256 "$PSScriptRoot/ocr-common.ps1") + $vs.installationVersion + $vs.installationPath)
 $stamp = Join-Path $native 'recipe.txt'
-if ((Test-Path -LiteralPath "$prefix/bin/tesseract.exe") -and (Test-Path -LiteralPath $stamp) -and (Get-Content -LiteralPath $stamp -Raw).Trim() -eq $key) {
+if ((Test-Path -LiteralPath "$prefix/lib/tesseract55.lib") -and (Test-Path -LiteralPath $stamp) -and (Get-Content -LiteralPath $stamp -Raw).Trim() -eq $key) {
     Write-Host 'Using cached minimal OCR build.'
     exit 0
+}
+
+# Never let headers or libraries installed by an older recipe shadow this build.
+if (Test-Path -LiteralPath $prefix) {
+    $resolvedPrefix = (Resolve-Path -LiteralPath $prefix).Path
+    $expectedPrefix = [IO.Path]::GetFullPath((Join-Path $repo '.tools/ocr/native/install'))
+    if ($resolvedPrefix -ne $expectedPrefix) { throw "Unexpected native install path: $resolvedPrefix" }
+    Remove-Item -LiteralPath $resolvedPrefix -Recurse -Force
 }
 
 $common = @('-G', $generator, '-A', 'x64', "-DCMAKE_GENERATOR_INSTANCE=$($vs.installationPath)",
@@ -63,19 +71,17 @@ $common = @('-G', $generator, '-A', 'x64', "-DCMAKE_GENERATOR_INSTANCE=$($vs.ins
     '-DCMAKE_POLICY_DEFAULT_CMP0091=NEW', '-DCMAKE_POLICY_VERSION_MINIMUM=3.10', '-DBUILD_SHARED_LIBS=OFF',
     '-DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF', '-DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF')
 $options = @{
-    zlib = @('-DZLIB_BUILD_SHARED=OFF', '-DZLIB_BUILD_STATIC=ON', '-DZLIB_BUILD_TESTING=OFF')
-    libpng = @('-DPNG_SHARED=OFF', '-DPNG_STATIC=ON', '-DPNG_TESTS=OFF', '-DPNG_TOOLS=OFF', "-DZLIB_LIBRARY=$prefix/lib/zs.lib")
-    leptonica = @('-DSW_BUILD=OFF', '-DBUILD_PROG=OFF', '-DSTRICT_CONF=ON', '-DENABLE_ZLIB=ON', '-DENABLE_PNG=ON',
-        '-DENABLE_GIF=OFF', '-DENABLE_JPEG=OFF', '-DENABLE_TIFF=OFF', '-DENABLE_WEBP=OFF', '-DENABLE_OPENJPEG=OFF', "-DZLIB_LIBRARY=$prefix/lib/zs.lib")
-    tesseract = @('-DWIN32_MT_BUILD=ON', '-DBUILD_TRAINING_TOOLS=OFF', '-DBUILD_TESTS=OFF', '-DOPENMP_BUILD=OFF',
+    leptonica = @('-DSW_BUILD=OFF', '-DBUILD_PROG=OFF', '-DSTRICT_CONF=ON', '-DENABLE_ZLIB=OFF', '-DENABLE_PNG=OFF',
+        '-DENABLE_GIF=OFF', '-DENABLE_JPEG=OFF', '-DENABLE_TIFF=OFF', '-DENABLE_WEBP=OFF', '-DENABLE_OPENJPEG=OFF')
+    tesseract = @('-DWIN32_MT_BUILD=ON', '-DDISABLED_LEGACY_ENGINE=ON', '-DBUILD_TRAINING_TOOLS=OFF', '-DBUILD_TESTS=OFF', '-DOPENMP_BUILD=OFF',
         '-DGRAPHICS_DISABLED=ON', '-DDISABLE_ARCHIVE=ON', '-DDISABLE_CURL=ON', '-DDISABLE_TIFF=ON', '-DENABLE_NATIVE=OFF',
         '-DCMAKE_CXX_FLAGS=-DTESSERACT_DISABLE_DEBUG_FONTS')
 }
 foreach ($package in $packages) {
     Write-Host "Building $($package.name) $($package.version)..."
-    $build = Join-Path $native $package.name
+    $build = Join-Path $native "$($package.name)-$($package.version)"
     Invoke-CMake (@('-S', (Join-Path $sources $package.directory), '-B', $build) + $common + $options[$package.name])
-    Invoke-CMake @('--build', $build, '--config', 'Release', '--parallel', '4')
+    Invoke-CMake @('--build', $build, '--config', 'Release', '--parallel', '4', '--clean-first')
     Invoke-CMake @('--install', $build, '--config', 'Release')
 }
 Set-Content -LiteralPath $stamp -Value $key
