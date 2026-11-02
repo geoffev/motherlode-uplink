@@ -115,7 +115,6 @@ export interface Settings {
   cropsDir: string | null
   cropRetentionDays: number
   lastTerminalId: string | null
-  tesseractPath: string | null
 }
 
 /** noGame: Star Citizen isn't running (or is minimised), so nothing is recorded. */

@@ -300,6 +300,7 @@ pub fn process_frame(app: &AppHandle, frame: &RgbaImage) -> Result<ScanOutcome, 
         reading.quantity.crop = save("quantity", reading.quantity.rect);
         reading.sizes.crop = save("sizes", reading.sizes.rect);
 
+        crops.allow_reading_previews(app, &reading);
         st.recent.guard().record(key, values, row_hash, reading.id.clone());
         st.readings.guard().upsert(reading.clone());
         let _ = app.emit("reading", &reading);
@@ -448,7 +449,7 @@ mod tests {
     #[ignore = "requires the local Orison screenshot in samples and prepared OCR"]
     fn real_sell_sample() {
         let resources = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("resources");
-        let ocr = crate::ocr::Tesseract::find(None, Some(&resources)).unwrap();
+        let ocr = crate::ocr::Tesseract::find(Some(&resources)).unwrap();
         let frame = image::open(resources.join("../../samples/1920x1080_orison_demand-and-stock.png")).unwrap().to_rgba8();
         let gray = vision::brightness(&frame);
         let catalog = crate::model::Catalog {

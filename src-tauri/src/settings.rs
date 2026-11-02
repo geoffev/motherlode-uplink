@@ -22,7 +22,6 @@ pub struct Settings {
     pub crops_dir: Option<PathBuf>,
     pub crop_retention_days: u32,
     pub last_terminal_id: Option<String>,
-    pub tesseract_path: Option<PathBuf>,
 }
 
 impl Default for Settings {
@@ -35,7 +34,6 @@ impl Default for Settings {
             crops_dir: None,
             crop_retention_days: 14,
             last_terminal_id: None,
-            tesseract_path: None,
         }
     }
 }
@@ -67,5 +65,19 @@ impl Settings {
         self.capture_fps = self.capture_fps.clamp(0.25, 2.0);
         self.crop_retention_days = self.crop_retention_days.clamp(1, 365);
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_executable_override_is_ignored() {
+        let settings: Settings = serde_json::from_str(
+            r#"{"tesseractPath":"C:\\untrusted.exe","captureFps":2.0}"#,
+        ).unwrap();
+        assert_eq!(settings.capture_fps, 2.0);
+        assert!(serde_json::to_value(settings).unwrap().get("tesseractPath").is_none());
     }
 }

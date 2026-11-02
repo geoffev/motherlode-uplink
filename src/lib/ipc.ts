@@ -22,7 +22,8 @@ export const ipc = {
 
   getCaptureStatus: () => invoke<CaptureStatus>('get_capture_status'),
   setCaptureEnabled: (enabled: boolean) => invoke<Settings>('set_capture_enabled', { enabled }),
-  scanImage: (path: string) => invoke<ScanOutcome>('scan_image', { path }),
+  scanImage: () => invoke<ScanOutcome | null>('scan_image'),
+  selectCropsFolder: () => invoke<string | null>('select_crops_folder'),
 
   getAppInfo: () => invoke<AppInfo>('get_app_info'),
   getSettings: () => invoke<Settings>('get_settings'),

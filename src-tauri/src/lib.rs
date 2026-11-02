@@ -39,17 +39,22 @@ fn init_state(app: &tauri::App) -> Result<AppState, Box<dyn std::error::Error>> 
     let me: Option<model::Me> = util::load_json(&paths.file("me.json"));
     let api_key = secrets::load_api_key();
     let resources = app.path().resource_dir()?;
-    let ocr = ocr::create(settings.tesseract_path.as_deref(), Some(&resources));
+    let ocr = ocr::create(Some(&resources));
     log::info!("OCR engine: {}", ocr.name());
+
+    let crops = store::Crops { root: settings.crops_dir.clone().unwrap_or_else(|| paths.data.join("crops")) };
+    let mut readings = store::Readings::load(paths.file("readings.json"));
+    readings.sanitise_paths(&crops);
 
     Ok(AppState {
         outbox: Mutex::new(outbox::Outbox::load(paths.file("outbox.json"))),
-        readings: Mutex::new(store::Readings::load(paths.file("readings.json"))),
+        readings: Mutex::new(readings),
         me: Mutex::new(if api_key.is_some() { me } else { None }),
         api_key: Mutex::new(api_key),
         catalog: Mutex::new(Arc::new(catalog)),
         ocr: Mutex::new(ocr),
         settings: Mutex::new(settings),
+        selected_crops_dir: Mutex::new(None),
         recent: Mutex::new(dedupe::Recent::default()),
         outbox_wake: Arc::new(tokio::sync::Notify::new()),
         capture_status: Mutex::new(CaptureStatus { state: CaptureState::Idle, message: None, source: String::new() }),
@@ -86,7 +91,9 @@ pub fn run() {
             app.manage(state);
 
             std::fs::create_dir_all(&crops.root)?;
-            let _ = app.asset_protocol_scope().allow_directory(&crops.root, true);
+            for reading in app.state::<AppState>().readings.guard().all() {
+                crops.allow_reading_previews(app.handle(), &reading);
+            }
             std::thread::spawn(move || crops.cleanup(retention));
 
             tray::build(app.handle())?;
@@ -143,6 +150,7 @@ pub fn run() {
             commands::get_capture_status,
             commands::set_capture_enabled,
             commands::scan_image,
+            commands::select_crops_folder,
             commands::get_app_info,
             commands::get_settings,
             commands::save_settings,

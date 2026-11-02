@@ -39,7 +39,7 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Prepare bundled OCR and verify English recognition
+      - name: Prepare native OCR libraries and English model
         run: npm run prepare:ocr
 
       - name: Known vulnerabilities in npm packages
